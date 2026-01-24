@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type SpeechRecognitionLike = {
   lang: string;
@@ -31,19 +31,32 @@ export function VoiceInput({
   lang?: string;
   onText: (text: string) => void;
 }) {
-  const SpeechRecognitionImpl = useMemo(() => {
-    if (typeof window === "undefined") return undefined;
-    return (window.SpeechRecognition ??
-      window.webkitSpeechRecognition) as SpeechRecognitionCtor | undefined;
-  }, []);
+  /**
+   * Responsibility:
+   * - Decide speech-recognition availability on the client only.
+   *
+   * Guard:
+   * - Avoid server/client branching during initial render to prevent hydration mismatch.
+   */
+  const [speechRecognitionCtor, setSpeechRecognitionCtor] = useState<
+    SpeechRecognitionCtor | undefined | null
+  >(null);
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!SpeechRecognitionImpl) return;
-    const recognition = new SpeechRecognitionImpl();
+    // Guard: only resolve browser APIs on the client.
+    const ctor = (window.SpeechRecognition ??
+      window.webkitSpeechRecognition) as SpeechRecognitionCtor | undefined;
+    // Guard: React treats function arguments as state updaters; wrap to store the function itself.
+    setSpeechRecognitionCtor(() => ctor);
+  }, []);
+
+  useEffect(() => {
+    if (!speechRecognitionCtor) return;
+    const recognition = new speechRecognitionCtor();
     recognition.lang = lang;
     recognition.continuous = false;
     recognition.interimResults = true;
@@ -74,11 +87,16 @@ export function VoiceInput({
 
     recognitionRef.current = recognition;
     return () => {
+      recognition.stop();
       recognitionRef.current = null;
     };
-  }, [SpeechRecognitionImpl, lang, onText]);
+  }, [speechRecognitionCtor, lang, onText]);
 
-  if (!SpeechRecognitionImpl) {
+  if (speechRecognitionCtor === null) {
+    return null;
+  }
+
+  if (!speechRecognitionCtor) {
     return (
       <div className="text-xs text-zinc-500">
         Voice input is not supported in this browser.
