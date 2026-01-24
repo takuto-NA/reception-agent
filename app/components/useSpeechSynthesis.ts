@@ -15,13 +15,17 @@ type SpeakOptions = {
   volume?: number;
 };
 
+const DEFAULT_SPEECH_SYNTHESIS_LANGUAGE_TAG = "ja-JP";
+
 export function useSpeechSynthesis() {
   const [isSupported, setIsSupported] = useState<boolean | null>(null);
   const currentUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   useEffect(() => {
     // Guard: detect browser API only on the client.
-    setIsSupported(typeof window !== "undefined" && "speechSynthesis" in window);
+    setIsSupported(
+      typeof window !== "undefined" && "speechSynthesis" in window,
+    );
   }, []);
 
   const cancel = useCallback(() => {
@@ -48,7 +52,7 @@ export function useSpeechSynthesis() {
         const DEFAULT_PITCH = 1.0;
         const DEFAULT_VOLUME = 1.0;
 
-        utterance.lang = options?.lang ?? "ja-JP";
+        utterance.lang = options?.lang ?? DEFAULT_SPEECH_SYNTHESIS_LANGUAGE_TAG;
         utterance.rate = options?.rate ?? DEFAULT_RATE;
         utterance.pitch = options?.pitch ?? DEFAULT_PITCH;
         utterance.volume = options?.volume ?? DEFAULT_VOLUME;
@@ -74,4 +78,3 @@ export function useSpeechSynthesis() {
 
   return { isSupported, speak, cancel };
 }
-

@@ -2,22 +2,32 @@ import { render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 import SettingsPage from "./page";
 
+function createOkJsonResponse(jsonBody: unknown): Response {
+  return {
+    ok: true,
+    json: async () => jsonBody,
+  } as unknown as Response;
+}
+
 describe("Settings page", () => {
   it("renders heading", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
-      .mockImplementation(async (input: any) => {
-        const url = typeof input === "string" ? input : input?.url;
-        if (url === "/api/tools") {
-          return {
-            ok: true,
-            json: async () => ({ tools: [{ key: "weather", id: "get-weather" }] }),
-          } as any;
+      .mockImplementation(async (requestInput: RequestInfo | URL) => {
+        const requestUrl =
+          typeof requestInput === "string"
+            ? requestInput
+            : (requestInput as Request).url;
+        if (requestUrl === "/api/tools") {
+          return createOkJsonResponse({
+            tools: [{ key: "weather", id: "get-weather" }],
+          });
         }
-        return {
-          ok: true,
-          json: async () => ({ systemPrompt: "x", model: "y", enabledTools: ["weather"] }),
-        } as any;
+        return createOkJsonResponse({
+          systemPrompt: "x",
+          model: "y",
+          enabledTools: ["weather"],
+        });
       });
 
     render(<SettingsPage />);
@@ -27,4 +37,3 @@ describe("Settings page", () => {
     fetchSpy.mockRestore();
   });
 });
-

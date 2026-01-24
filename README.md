@@ -15,32 +15,33 @@ Mastra + Groq で動く **ツール実行可能なAIエージェント**のサ�
 
 ### Setup
 
-1) Install deps
+1. Install deps
 
 ```bash
 npm install
 ```
 
-2) Configure env
+2. Configure env
 
-- Copy [`.env.example`](.env.example) → `.env.local`（もしくは `.env`）
-- Prisma 用に `DATABASE_URL` も設定してください（例: `file:./dev.db`）
+- Copy [`env.example`](env.example) → `.env.local`（もしくは `.env`）
+- Prisma 用に `DATABASE_URL` も設定してください（例: `file:./prisma/dev.db`）。
+  - 未設定の場合は `lib/prisma.ts` のフォールバックで `file:./prisma/dev.db` が使われます。
 
 例:
 
 ```bash
 GROQ_API_KEY=...
 GROQ_MODEL=groq/llama-3.3-70b-versatile
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="file:./prisma/dev.db"
 ```
 
-3) Create/update DB
+3. Create/update DB
 
 ```bash
 npx prisma migrate dev
 ```
 
-4) Run dev server
+4. Run dev server
 
 ```bash
 npm run dev
@@ -58,6 +59,12 @@ Open `http://localhost:3000`.
 
 `/api/chat` は Settings から保存した **system prompt / model / enabled tools** を読み込み、Mastra Agent の実行オプションに反映します。
 
+> 優先順位（初見向け）
+>
+> 1. DB（Settings画面で保存した値）
+> 2. 環境変数（`GROQ_MODEL` など）
+> 3. コード内のデフォルト（フォールバック）
+
 ### Settings
 
 - UI: [`app/settings/page.tsx`](app/settings/page.tsx)
@@ -73,16 +80,24 @@ Settings 画面は `/api/tools`（[`app/api/tools/route.ts`](app/api/tools/route
 
 ### Voice input
 
-[`app/components/VoiceInput.tsx`](app/components/VoiceInput.tsx) をチャット入力に統合しています。\nブラウザによっては Web Speech API が使えません（その場合はボタンが表示されません）。
+[`app/components/VoiceInput.tsx`](app/components/VoiceInput.tsx) をチャット入力に統合しています。
+ブラウザによっては Web Speech API が使えません（その場合はボタンが表示されません）。
 
 ## Commands
 
 ```bash
 npm test
 npm run build
+npm run format
 ```
 
 > Note: `npm run build` は `next build --webpack` を使っています（環境によって Turbopack build がハングするケースがあったため）。
+
+## Developer docs
+
+- [ツール追加](docs/extension-tools.md)
+- [エージェント追加](docs/extension-agents.md)
+- [Settings項目追加](docs/extension-settings.md)
 
 ## Notes
 

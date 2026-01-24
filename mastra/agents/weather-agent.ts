@@ -1,10 +1,10 @@
-import { Agent } from '@mastra/core/agent';
-import { Memory } from '@mastra/memory';
-import { tools } from '../tools/registry';
+import { Agent } from "@mastra/core/agent";
+import { Memory } from "@mastra/memory";
+import { tools } from "../tools/registry";
 
 export const weatherAgent = new Agent({
-  id: 'weather-agent',
-  name: 'Weather Agent',
+  id: "weather-agent",
+  name: "Weather Agent",
   instructions: `
       You are a helpful weather assistant that provides accurate weather information and can help planning activities based on the weather.
 
@@ -20,7 +20,7 @@ export const weatherAgent = new Agent({
       Use the weatherTool to fetch current weather data.
 `,
   // Default to Groq via Mastra model router (uses GROQ_API_KEY env var)
-  model: process.env.GROQ_MODEL ?? 'groq/llama-3.3-70b-versatile',
+  model: process.env.GROQ_MODEL ?? "groq/llama-3.3-70b-versatile",
   tools,
 
   memory: new Memory(),

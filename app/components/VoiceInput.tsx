@@ -28,6 +28,8 @@ export type VoiceInputHandle = {
   isListening: () => boolean;
 };
 
+const DEFAULT_SPEECH_RECOGNITION_LANGUAGE_TAG = "ja-JP";
+
 declare global {
   interface Window {
     webkitSpeechRecognition?: SpeechRecognitionCtor;
@@ -42,7 +44,10 @@ export const VoiceInput = forwardRef<
     lang?: string;
     onFinalText: (text: string) => void;
   }
->(function VoiceInputInner({ disabled, lang = "ja-JP", onFinalText }, ref) {
+>(function VoiceInputInner(
+  { disabled, lang = DEFAULT_SPEECH_RECOGNITION_LANGUAGE_TAG, onFinalText },
+  ref,
+) {
   /**
    * Responsibility:
    * - Decide speech-recognition availability on the client only.
@@ -73,18 +78,22 @@ export const VoiceInput = forwardRef<
     recognition.continuous = false;
     recognition.interimResults = true;
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (resultEvent: any) => {
       let finalText = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const res = event.results[i];
-        const text = res[0]?.transcript ?? "";
-        if (res.isFinal) finalText += text;
+      for (
+        let resultIndex = resultEvent.resultIndex;
+        resultIndex < resultEvent.results.length;
+        resultIndex++
+      ) {
+        const speechResult = resultEvent.results[resultIndex];
+        const text = speechResult[0]?.transcript ?? "";
+        if (speechResult.isFinal) finalText += text;
       }
       if (finalText.trim()) onFinalText(finalText.trim());
     };
 
-    recognition.onerror = (e: any) => {
-      setError(e?.error || "speech-error");
+    recognition.onerror = (errorEvent: any) => {
+      setError(errorEvent?.error || "speech-error");
       setListening(false);
     };
 
@@ -174,4 +183,3 @@ export const VoiceInput = forwardRef<
     </div>
   );
 });
-

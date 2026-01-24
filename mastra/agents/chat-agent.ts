@@ -19,4 +19,3 @@ You are a helpful assistant.
   tools,
   memory: new Memory(),
 });
-

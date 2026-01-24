@@ -19,4 +19,3 @@ describe("Home page", () => {
     expect(screen.getByRole("heading", { name: "Chat" })).toBeTruthy();
   });
 });
-

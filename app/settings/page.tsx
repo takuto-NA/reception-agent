@@ -1,18 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-type AppConfigDTO = {
-  systemPrompt: string;
-  model: string;
-  enabledTools: string[];
-};
-
-type ToolCatalogItem = {
-  key: string;
-  id: string;
-  description?: string;
-};
+import {
+  fetchSettingsAndTools,
+  type AppConfigDTO,
+  type ToolCatalogItem,
+  toSettingsErrorMessage,
+  updateSettings,
+} from "./settingsApi";
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -26,30 +21,43 @@ export default function SettingsPage() {
   const [tools, setTools] = useState<ToolCatalogItem[]>([]);
 
   useEffect(() => {
-    let mounted = true;
+    const abortController = new AbortController();
     (async () => {
       try {
-        const [settingsRes, toolsRes] = await Promise.all([
-          fetch("/api/settings"),
-          fetch("/api/tools"),
-        ]);
-        const data = (await settingsRes.json()) as AppConfigDTO;
-        const toolData = (await toolsRes.json()) as { tools: ToolCatalogItem[] };
-        if (!mounted) return;
-        setConfig(data);
-        setTools(toolData.tools ?? []);
-      } catch (e) {
-        if (!mounted) return;
-        setError(String(e));
+        const { config: settingsConfig, tools: toolCatalog } =
+          await fetchSettingsAndTools(abortController.signal);
+        // Guard: request was aborted (unmounted).
+        if (abortController.signal.aborted) return;
+        setConfig(settingsConfig);
+        setTools(toolCatalog);
+      } catch (caughtError) {
+        // Guard: request was aborted (unmounted).
+        if (abortController.signal.aborted) return;
+        setError(toSettingsErrorMessage(caughtError));
       } finally {
-        if (!mounted) return;
+        // Guard: request was aborted (unmounted).
+        if (abortController.signal.aborted) return;
         setLoading(false);
       }
     })();
     return () => {
-      mounted = false;
+      abortController.abort();
     };
   }, []);
+
+  async function handleSubmit(submitEvent: React.FormEvent<HTMLFormElement>) {
+    submitEvent.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      const updatedConfig = await updateSettings(config);
+      setConfig(updatedConfig);
+    } catch (caughtError) {
+      setError(toSettingsErrorMessage(caughtError));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -69,38 +77,16 @@ export default function SettingsPage() {
             Loading…
           </div>
         ) : (
-          <form
-            className="space-y-4"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setSaving(true);
-              setError(null);
-              try {
-                const res = await fetch("/api/settings", {
-                  method: "PUT",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(config),
-                });
-                const data = await res.json();
-                if (!res.ok) {
-                  throw new Error(
-                    data?.error ? String(data.error) : "Save failed",
-                  );
-                }
-                setConfig(data as AppConfigDTO);
-              } catch (err) {
-                setError(String((err as any).message || err));
-              } finally {
-                setSaving(false);
-              }
-            }}
-          >
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-1">
               <label className="text-sm font-medium">Model</label>
               <input
                 value={config.model}
-                onChange={(e) =>
-                  setConfig((c) => ({ ...c, model: e.target.value }))
+                onChange={(changeEvent) =>
+                  setConfig((previousConfig) => ({
+                    ...previousConfig,
+                    model: changeEvent.target.value,
+                  }))
                 }
                 placeholder="groq/llama-3.3-70b-versatile"
                 className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-white/10 dark:bg-black/30 dark:focus:ring-white/20"
@@ -114,8 +100,11 @@ export default function SettingsPage() {
               <label className="text-sm font-medium">System prompt</label>
               <textarea
                 value={config.systemPrompt}
-                onChange={(e) =>
-                  setConfig((c) => ({ ...c, systemPrompt: e.target.value }))
+                onChange={(changeEvent) =>
+                  setConfig((previousConfig) => ({
+                    ...previousConfig,
+                    systemPrompt: changeEvent.target.value,
+                  }))
                 }
                 rows={10}
                 className="w-full resize-y rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-white/10 dark:bg-black/30 dark:focus:ring-white/20"
@@ -128,30 +117,35 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <div className="text-sm font-medium">Tools</div>
               <div className="space-y-2">
-                {tools.map((t) => {
-                  const checked = config.enabledTools.includes(t.key);
+                {tools.map((toolItem) => {
+                  const isChecked = config.enabledTools.includes(toolItem.key);
                   return (
                     <label
-                      key={t.key}
+                      key={toolItem.key}
                       className="flex items-start gap-3 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-white/10"
                     >
                       <input
                         type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          const next = e.target.checked
+                        checked={isChecked}
+                        onChange={(changeEvent) => {
+                          const nextEnabledTools = changeEvent.target.checked
                             ? Array.from(
-                                new Set([...config.enabledTools, t.key]),
+                                new Set([...config.enabledTools, toolItem.key]),
                               )
-                            : config.enabledTools.filter((k) => k !== t.key);
-                          setConfig((c) => ({ ...c, enabledTools: next }));
+                            : config.enabledTools.filter(
+                                (toolKey) => toolKey !== toolItem.key,
+                              );
+                          setConfig((previousConfig) => ({
+                            ...previousConfig,
+                            enabledTools: nextEnabledTools,
+                          }));
                         }}
                         className="mt-1"
                       />
                       <div className="min-w-0">
-                        <div className="font-medium">{t.key}</div>
+                        <div className="font-medium">{toolItem.key}</div>
                         <div className="text-xs text-zinc-500">
-                          {t.description || t.id}
+                          {toolItem.description || toolItem.id}
                         </div>
                       </div>
                     </label>
@@ -180,4 +174,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-

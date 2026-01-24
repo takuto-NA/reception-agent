@@ -50,9 +50,7 @@ export default function RootLayout({
               </nav>
             </div>
           </header>
-          <main className="mx-auto w-full max-w-5xl px-4 py-8">
-            {children}
-          </main>
+          <main className="mx-auto w-full max-w-5xl px-4 py-8">{children}</main>
         </div>
       </body>
     </html>
