@@ -15,7 +15,7 @@ const ChatRequestSchema = z
   .object({
     messages: z.array(ChatMessageSchema).max(MAX_CHAT_MESSAGES),
   })
-  .strict();
+  .passthrough();
 
 function toUiMessageStream(agentStream: unknown) {
   /**
