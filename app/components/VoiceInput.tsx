@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 
 type SpeechRecognitionLike = {
   lang: string;
@@ -15,6 +21,13 @@ type SpeechRecognitionLike = {
 
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
+export type VoiceInputHandle = {
+  isSupported: () => boolean;
+  startListening: () => void;
+  stopListening: () => void;
+  isListening: () => boolean;
+};
+
 declare global {
   interface Window {
     webkitSpeechRecognition?: SpeechRecognitionCtor;
@@ -22,15 +35,14 @@ declare global {
   }
 }
 
-export function VoiceInput({
-  disabled,
-  lang = "ja-JP",
-  onText,
-}: {
-  disabled?: boolean;
-  lang?: string;
-  onText: (text: string) => void;
-}) {
+export const VoiceInput = forwardRef<
+  VoiceInputHandle,
+  {
+    disabled?: boolean;
+    lang?: string;
+    onFinalText: (text: string) => void;
+  }
+>(function VoiceInputInner({ disabled, lang = "ja-JP", onFinalText }, ref) {
   /**
    * Responsibility:
    * - Decide speech-recognition availability on the client only.
@@ -63,17 +75,12 @@ export function VoiceInput({
 
     recognition.onresult = (event: any) => {
       let finalText = "";
-      let interimText = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const res = event.results[i];
         const text = res[0]?.transcript ?? "";
         if (res.isFinal) finalText += text;
-        else interimText += text;
       }
-      if (finalText.trim()) onText(finalText.trim());
-      if (interimText.trim()) {
-        // optional: show interim to user; we keep UI minimal for now
-      }
+      if (finalText.trim()) onFinalText(finalText.trim());
     };
 
     recognition.onerror = (e: any) => {
@@ -90,7 +97,37 @@ export function VoiceInput({
       recognition.stop();
       recognitionRef.current = null;
     };
-  }, [speechRecognitionCtor, lang, onText]);
+  }, [speechRecognitionCtor, lang, onFinalText]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      isSupported: () => Boolean(speechRecognitionCtor),
+      startListening: () => {
+        // Guard: cannot start while disabled.
+        if (disabled) return;
+        const recognition = recognitionRef.current;
+        // Guard: speech recognition is not ready/available.
+        if (!recognition) return;
+        // Guard: already listening.
+        if (listening) return;
+
+        setError(null);
+        setListening(true);
+        recognition.start();
+      },
+      stopListening: () => {
+        const recognition = recognitionRef.current;
+        // Guard: speech recognition is not ready/available.
+        if (!recognition) return;
+
+        recognition.stop();
+        setListening(false);
+      },
+      isListening: () => listening,
+    }),
+    [disabled, listening, speechRecognitionCtor],
+  );
 
   if (speechRecognitionCtor === null) {
     return null;
@@ -110,16 +147,22 @@ export function VoiceInput({
         type="button"
         disabled={disabled}
         onClick={() => {
-          setError(null);
-          const rec = recognitionRef.current;
-          if (!rec) return;
           if (listening) {
-            rec.stop();
-            setListening(false);
+            const recognition = recognitionRef.current;
+            // Guard: speech recognition is not ready/available.
+            if (!recognition) return;
+
+            recognition.stop();
             return;
           }
+
+          const recognition = recognitionRef.current;
+          // Guard: speech recognition is not ready/available.
+          if (!recognition) return;
+
+          setError(null);
           setListening(true);
-          rec.start();
+          recognition.start();
         }}
         className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm hover:bg-zinc-50 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
       >
@@ -130,5 +173,5 @@ export function VoiceInput({
       ) : null}
     </div>
   );
-}
+});
 

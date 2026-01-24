@@ -3,7 +3,8 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { VoiceInput } from "./components/VoiceInput";
+import { VoiceInput, type VoiceInputHandle } from "./components/VoiceInput";
+import { useSpeechSynthesis } from "./components/useSpeechSynthesis";
 
 function extractMessageText(message: any): string {
   const parts = message?.parts;
@@ -33,10 +34,77 @@ export default function Home() {
   const { messages, status, error, sendMessage, stop } = useChat({ transport });
   const [input, setInput] = useState("");
 
+  const [isVoiceConversationModeEnabled, setIsVoiceConversationModeEnabled] =
+    useState(false);
+  const [isAutoSendEnabled, setIsAutoSendEnabled] = useState(true);
+  const [isTextToSpeechEnabled, setIsTextToSpeechEnabled] = useState(true);
+
+  const voiceInputRef = useRef<VoiceInputHandle | null>(null);
+  const { isSupported: isTextToSpeechSupported, speak: speakTextToSpeech } =
+    useSpeechSynthesis();
+
+  const lastHandledAssistantMessageIdRef = useRef<string | null>(null);
+
   const endRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, status]);
+
+  useEffect(() => {
+    // Guard: voice conversation mode is disabled.
+    if (!isVoiceConversationModeEnabled) return;
+    // Guard: do not start listening while assistant is streaming.
+    if (status === "streaming") return;
+
+    voiceInputRef.current?.startListening();
+  }, [isVoiceConversationModeEnabled, status]);
+
+  useEffect(() => {
+    // Guard: wait until the assistant finished streaming the response.
+    if (status === "streaming") return;
+    // Guard: voice conversation mode is disabled.
+    if (!isVoiceConversationModeEnabled) return;
+
+    const lastAssistantMessage = [...messages]
+      .reverse()
+      .find((m: any) => m?.role === "assistant");
+    // Guard: no assistant message yet.
+    if (!lastAssistantMessage?.id) return;
+    // Guard: already handled this assistant message.
+    if (lastHandledAssistantMessageIdRef.current === lastAssistantMessage.id)
+      return;
+
+    lastHandledAssistantMessageIdRef.current = lastAssistantMessage.id;
+
+    const assistantText = extractMessageText(lastAssistantMessage);
+    const resumeListening = () => voiceInputRef.current?.startListening();
+
+    // Guard: do not start voice recognition while status is streaming.
+    if (status === "streaming") return;
+
+    if (!isTextToSpeechEnabled) {
+      resumeListening();
+      return;
+    }
+
+    // Guard: Text-to-Speech is not supported in this browser.
+    if (isTextToSpeechSupported === false) {
+      resumeListening();
+      return;
+    }
+
+    (async () => {
+      await speakTextToSpeech(assistantText, { lang: "ja-JP" });
+      resumeListening();
+    })();
+  }, [
+    isTextToSpeechEnabled,
+    isTextToSpeechSupported,
+    isVoiceConversationModeEnabled,
+    messages,
+    speakTextToSpeech,
+    status,
+  ]);
 
   return (
     <div className="space-y-6">
@@ -102,12 +170,60 @@ export default function Home() {
                 className="w-full resize-none rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-white/10 dark:bg-black/30 dark:focus:ring-white/20"
               />
               <div className="mt-2 flex items-center justify-between gap-2">
-                <div className="text-xs text-zinc-500">Status: {status}</div>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+                  <div>Status: {status}</div>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isVoiceConversationModeEnabled}
+                      onChange={(e) =>
+                        setIsVoiceConversationModeEnabled(e.target.checked)
+                      }
+                    />
+                    Voice mode
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isAutoSendEnabled}
+                      onChange={(e) => setIsAutoSendEnabled(e.target.checked)}
+                      disabled={!isVoiceConversationModeEnabled}
+                    />
+                    Auto send
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isTextToSpeechEnabled}
+                      onChange={(e) =>
+                        setIsTextToSpeechEnabled(e.target.checked)
+                      }
+                      disabled={!isVoiceConversationModeEnabled}
+                    />
+                    Read aloud
+                  </label>
+                </div>
                 <VoiceInput
+                  ref={voiceInputRef}
                   disabled={status === "streaming"}
-                  onText={(text) =>
-                    setInput((prev) => (prev ? `${prev} ${text}` : text))
-                  }
+                  onFinalText={(text) => {
+                    if (!isVoiceConversationModeEnabled) {
+                      setInput((prev) => (prev ? `${prev} ${text}` : text));
+                      return;
+                    }
+
+                    if (!isAutoSendEnabled) {
+                      setInput((prev) => (prev ? `${prev} ${text}` : text));
+                      return;
+                    }
+
+                    const trimmed = text.trim();
+                    // Guard: empty speech result.
+                    if (!trimmed) return;
+
+                    sendMessage({ text: trimmed });
+                    setInput("");
+                  }}
                 />
               </div>
             </div>
