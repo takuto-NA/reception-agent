@@ -64,15 +64,45 @@ export function useVoiceConversationController({
   speakTextToSpeech,
 }: Params) {
   const lastHandledAssistantMessageIdRef = useRef<string | null>(null);
+  const isTextToSpeechPlaybackInProgressRef = useRef(false);
+
+  const POST_TEXT_TO_SPEECH_RESUME_DELAY_MILLISECONDS = 600;
+
+  function getLastAssistantMessage(): UiMessageLike | undefined {
+    return [...messages].reverse().find((message) => message.role === "assistant");
+  }
 
   useEffect(() => {
     // Guard: voice conversation mode is disabled.
     if (!isVoiceConversationModeEnabled) return;
     // Guard: do not start listening while assistant is streaming.
     if (isAssistantStreaming) return;
+    // Guard: do not start listening during text-to-speech playback.
+    // (Prevents the assistant's own voice from being recognized.)
+    if (isTextToSpeechPlaybackInProgressRef.current) return;
+
+    const isTextToSpeechPotentiallyAvailable =
+      isTextToSpeechEnabled && isTextToSpeechSupported !== false;
+    if (isTextToSpeechPotentiallyAvailable) {
+      const lastAssistantMessage = getLastAssistantMessage();
+      const lastAssistantMessageId = lastAssistantMessage?.id;
+      const hasUnhandledAssistantMessage =
+        Boolean(lastAssistantMessageId) &&
+        lastHandledAssistantMessageIdRef.current !== lastAssistantMessageId;
+
+      // Guard: about to read the assistant message; don't start mic now.
+      if (hasUnhandledAssistantMessage) return;
+    }
 
     voiceInputRef.current?.startListening();
-  }, [isAssistantStreaming, isVoiceConversationModeEnabled, voiceInputRef]);
+  }, [
+    isAssistantStreaming,
+    isTextToSpeechEnabled,
+    isTextToSpeechSupported,
+    isVoiceConversationModeEnabled,
+    messages,
+    voiceInputRef,
+  ]);
 
   useEffect(() => {
     // Guard: wait until the assistant finished streaming the response.
@@ -80,9 +110,7 @@ export function useVoiceConversationController({
     // Guard: voice conversation mode is disabled.
     if (!isVoiceConversationModeEnabled) return;
 
-    const lastAssistantMessage = [...messages]
-      .reverse()
-      .find((message) => message.role === "assistant");
+    const lastAssistantMessage = getLastAssistantMessage();
     // Guard: no assistant message yet.
     if (!lastAssistantMessage?.id) return;
     // Guard: already handled this assistant message.
@@ -106,7 +134,14 @@ export function useVoiceConversationController({
     }
 
     (async () => {
+      // Guard: stop mic before speaking to prevent self-recognition.
+      voiceInputRef.current?.stopListening();
+      isTextToSpeechPlaybackInProgressRef.current = true;
       await speakTextToSpeech(assistantText, { lang: speechLanguageTag });
+      await new Promise<void>((resolve) =>
+        setTimeout(resolve, POST_TEXT_TO_SPEECH_RESUME_DELAY_MILLISECONDS),
+      );
+      isTextToSpeechPlaybackInProgressRef.current = false;
       resumeListening();
     })();
   }, [
