@@ -15,6 +15,7 @@ model AppConfig {
   systemPrompt String
   model        String
   enabledTools Json?
+  voiceSettings Json?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

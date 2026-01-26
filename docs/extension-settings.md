@@ -9,7 +9,7 @@
 1) DB（Prisma）を拡張
 
 - `prisma/schema.prisma` の `AppConfig` にカラムを追加
-- `npx prisma migrate dev` を実行
+- `npx prisma migrate dev` を実行\n  （詰まりやすいポイントは [Prisma/DB 操作メモ](prisma-operations.md) を参照）
 
 2) サーバ（DTO）を拡張
 
@@ -21,5 +21,5 @@
 
 4) UIを更新
 
-- `app/settings/page.tsx` でフォーム項目を追加\n  （API呼び出しは `app/settings/settingsApi.ts` 側に閉じ込める）
+- Settingsはタブ（ルート分割）で拡張します。\n  目的のカテゴリに合わせてページを選んでフォーム項目を追加してください。\n\n  - General: `app/settings/page.tsx`\n  - Tools: `app/settings/tools/page.tsx`\n  - Voice: `app/settings/voice/page.tsx`\n\n+- タブ自体を増やす場合は `app/settings/SettingsTabs.tsx` にリンクを追加します。\n\n+- API呼び出しは `app/settings/settingsApi.ts` 側に閉じ込め、ページ側はUIとstateのみに集中させます。
 

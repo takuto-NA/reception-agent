@@ -98,6 +98,7 @@ npm run format
 - [ツール追加](docs/extension-tools.md)
 - [エージェント追加](docs/extension-agents.md)
 - [Settings項目追加](docs/extension-settings.md)
+- [Prisma/DB 操作メモ](docs/prisma-operations.md)
 
 ## Notes
 

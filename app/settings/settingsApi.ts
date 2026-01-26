@@ -6,10 +6,38 @@
  * - Keep fetch/JSON parsing and error shaping out of the component for readability.
  */
 
+export type TextToSpeechEngine = "webSpeech" | "voicevox";
+
+export type WebSpeechVoiceSettingsDTO = {
+  rate: number;
+  pitch: number;
+  volume: number;
+};
+
+export type VoiceVoxVoiceSettingsDTO = {
+  engineUrl: string;
+  speakerId: number;
+  speedScale: number;
+  pitchScale: number;
+  intonationScale: number;
+  volumeScale: number;
+};
+
+export type VoiceSettingsDTO = {
+  isVoiceConversationModeEnabledByDefault: boolean;
+  isAutoSendEnabledByDefault: boolean;
+  isTextToSpeechEnabledByDefault: boolean;
+  speechLanguageTag: string;
+  textToSpeechEngine: TextToSpeechEngine;
+  webSpeech: WebSpeechVoiceSettingsDTO;
+  voicevox: VoiceVoxVoiceSettingsDTO;
+};
+
 export type AppConfigDTO = {
   systemPrompt: string;
   model: string;
   enabledTools: string[];
+  voiceSettings: VoiceSettingsDTO;
 };
 
 export type ToolCatalogItem = {
@@ -29,22 +57,53 @@ function getErrorMessage(caughtError: unknown): string {
 async function readJson<ResponseBody>(
   response: Response,
 ): Promise<ResponseBody> {
-  const body = (await response.json()) as ResponseBody;
-  return body;
+  try {
+    const body = (await response.json()) as ResponseBody;
+    return body;
+  } catch {
+    throw new Error("Invalid JSON response");
+  }
 }
 
-export async function fetchSettingsAndTools(
+export async function fetchSettings(signal?: AbortSignal): Promise<AppConfigDTO> {
+  const response = await fetch("/api/settings", { signal });
+  if (response.ok) {
+    const responseBody = await readJson<unknown>(response);
+    return responseBody as AppConfigDTO;
+  }
+
+  const responseText = await response.text().catch(() => "");
+  const fallbackMessage = `Load failed (status: ${response.status})`;
+  if (!responseText.trim()) throw new Error(fallbackMessage);
+
+  try {
+    const parsedJson = JSON.parse(responseText) as unknown;
+    const errorText =
+      typeof parsedJson === "object" &&
+      parsedJson !== null &&
+      "error" in parsedJson
+        ? String((parsedJson as { error?: unknown }).error)
+        : fallbackMessage;
+    throw new Error(errorText);
+  } catch {
+    throw new Error(responseText);
+  }
+}
+
+export async function fetchToolCatalog(
   signal?: AbortSignal,
-): Promise<{ config: AppConfigDTO; tools: ToolCatalogItem[] }> {
-  const [settingsResponse, toolsResponse] = await Promise.all([
-    fetch("/api/settings", { signal }),
-    fetch("/api/tools", { signal }),
-  ]);
+): Promise<ToolCatalogItem[]> {
+  const response = await fetch("/api/tools", { signal });
+  if (response.ok) {
+    const responseBody = await readJson<unknown>(response);
+    const toolsPayload = responseBody as ToolsResponseBody;
+    return toolsPayload.tools ?? [];
+  }
 
-  const settingsConfig = await readJson<AppConfigDTO>(settingsResponse);
-  const toolsPayload = await readJson<ToolsResponseBody>(toolsResponse);
-
-  return { config: settingsConfig, tools: toolsPayload.tools ?? [] };
+  const responseText = await response.text().catch(() => "");
+  const fallbackMessage = `Load failed (status: ${response.status})`;
+  if (!responseText.trim()) throw new Error(fallbackMessage);
+  throw new Error(responseText);
 }
 
 export async function updateSettings(
@@ -56,18 +115,15 @@ export async function updateSettings(
     body: JSON.stringify(nextConfig),
   });
 
-  const responseBody = await readJson<unknown>(updateResponse);
   if (updateResponse.ok) {
+    const responseBody = await readJson<unknown>(updateResponse);
     return responseBody as AppConfigDTO;
   }
 
-  const errorText =
-    typeof responseBody === "object" &&
-    responseBody !== null &&
-    "error" in responseBody
-      ? String((responseBody as { error?: unknown }).error)
-      : "Save failed";
-  throw new Error(errorText);
+  const responseText = await updateResponse.text().catch(() => "");
+  const fallbackMessage = `Save failed (status: ${updateResponse.status})`;
+  if (!responseText.trim()) throw new Error(fallbackMessage);
+  throw new Error(responseText);
 }
 
 export function toSettingsErrorMessage(caughtError: unknown): string {

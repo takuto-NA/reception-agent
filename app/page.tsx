@@ -4,13 +4,35 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { VoiceInput, type VoiceInputHandle } from "./components/VoiceInput";
-import { useSpeechSynthesis } from "./components/useSpeechSynthesis";
+import {
+  useTextToSpeech,
+  type TextToSpeechSettings,
+} from "./components/useTextToSpeech";
 import {
   type UiMessageLike,
   useVoiceConversationController,
 } from "./components/useVoiceConversationController";
+import {
+  fetchSettings,
+  toSettingsErrorMessage,
+  type AppConfigDTO,
+} from "./settings/settingsApi";
 
-const SPEECH_RECOGNITION_LANGUAGE_TAG = "ja-JP";
+const DEFAULT_SPEECH_LANGUAGE_TAG = "ja-JP";
+
+const DEFAULT_TEXT_TO_SPEECH_SETTINGS: TextToSpeechSettings = {
+  textToSpeechEngine: "webSpeech",
+  speechLanguageTag: DEFAULT_SPEECH_LANGUAGE_TAG,
+  webSpeech: { rate: 1.0, pitch: 1.0, volume: 1.0 },
+  voicevox: {
+    engineUrl: "http://127.0.0.1:50021",
+    speakerId: 1,
+    speedScale: 1.0,
+    pitchScale: 0.0,
+    intonationScale: 1.0,
+    volumeScale: 1.0,
+  },
+};
 
 // UI readability constants (avoid burying critical layout intent in strings).
 const CHAT_SCROLL_MAX_HEIGHT_CLASS = "max-h-[60vh]";
@@ -46,6 +68,13 @@ export default function Home() {
     [],
   );
 
+  const [settingsLoadError, setSettingsLoadError] = useState<string | null>(null);
+  const [textToSpeechSettings, setTextToSpeechSettings] =
+    useState<TextToSpeechSettings>(DEFAULT_TEXT_TO_SPEECH_SETTINGS);
+  const [speechLanguageTag, setSpeechLanguageTag] = useState(
+    DEFAULT_SPEECH_LANGUAGE_TAG,
+  );
+
   const {
     messages: rawMessages,
     status,
@@ -74,8 +103,46 @@ export default function Home() {
   const [isTextToSpeechEnabled, setIsTextToSpeechEnabled] = useState(true);
 
   const voiceInputRef = useRef<VoiceInputHandle | null>(null);
-  const { isSupported: isTextToSpeechSupported, speak: speakTextToSpeech } =
-    useSpeechSynthesis();
+  const {
+    isSupported: isTextToSpeechSupported,
+    speak: speakTextToSpeechInternal,
+    cancel: cancelTextToSpeech,
+  } = useTextToSpeech(textToSpeechSettings);
+
+  useEffect(() => {
+    const abortController = new AbortController();
+    (async () => {
+      try {
+        const appConfig: AppConfigDTO = await fetchSettings(abortController.signal);
+        // Guard: request was aborted (unmounted).
+        if (abortController.signal.aborted) return;
+
+        const voiceSettings = appConfig.voiceSettings;
+
+        setIsVoiceConversationModeEnabled(
+          voiceSettings.isVoiceConversationModeEnabledByDefault,
+        );
+        setIsAutoSendEnabled(voiceSettings.isAutoSendEnabledByDefault);
+        setIsTextToSpeechEnabled(voiceSettings.isTextToSpeechEnabledByDefault);
+        setSpeechLanguageTag(voiceSettings.speechLanguageTag);
+        setTextToSpeechSettings({
+          textToSpeechEngine: voiceSettings.textToSpeechEngine,
+          speechLanguageTag: voiceSettings.speechLanguageTag,
+          webSpeech: voiceSettings.webSpeech,
+          voicevox: voiceSettings.voicevox,
+        });
+        setSettingsLoadError(null);
+      } catch (caughtError) {
+        // Guard: request was aborted (unmounted).
+        if (abortController.signal.aborted) return;
+        setSettingsLoadError(toSettingsErrorMessage(caughtError));
+      }
+    })();
+
+    return () => {
+      abortController.abort();
+    };
+  }, []);
 
   const endRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -87,10 +154,12 @@ export default function Home() {
     isTextToSpeechEnabled,
     isTextToSpeechSupported,
     isAssistantStreaming,
-    speechLanguageTag: SPEECH_RECOGNITION_LANGUAGE_TAG,
+    speechLanguageTag,
     messages,
     voiceInputRef,
-    speakTextToSpeech,
+    speakTextToSpeech: async (text: string) => {
+      await speakTextToSpeechInternal(text);
+    },
   });
 
   return (
@@ -100,6 +169,11 @@ export default function Home() {
         <p className="text-sm text-zinc-600 dark:text-zinc-300">
           Streaming chat powered by Mastra + Groq.
         </p>
+        {settingsLoadError ? (
+          <div className="text-sm text-red-600 dark:text-red-400">
+            Settings load failed: {settingsLoadError}
+          </div>
+        ) : null}
         {error ? (
           <div className="text-sm text-red-600 dark:text-red-400">
             {getErrorMessage(error)}
@@ -197,6 +271,7 @@ export default function Home() {
                 <VoiceInput
                   ref={voiceInputRef}
                   disabled={isAssistantStreaming}
+                  lang={speechLanguageTag}
                   onFinalText={(text) => {
                     if (!isVoiceConversationModeEnabled) {
                       setInput((previousInput) =>
@@ -232,6 +307,13 @@ export default function Home() {
                   Stop
                 </button>
               ) : null}
+              <button
+                type="button"
+                onClick={() => cancelTextToSpeech()}
+                className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm hover:bg-zinc-50 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+              >
+                Stop voice
+              </button>
               <button
                 type="submit"
                 disabled={!input.trim() || isAssistantStreaming}

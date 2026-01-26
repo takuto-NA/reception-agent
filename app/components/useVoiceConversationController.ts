@@ -120,7 +120,11 @@ export function useVoiceConversationController({
     lastHandledAssistantMessageIdRef.current = lastAssistantMessage.id;
 
     const assistantText = extractMessageText(lastAssistantMessage);
-    const resumeListening = () => voiceInputRef.current?.startListening();
+    const resumeListening = () => {
+      // Guard: voice conversation mode is disabled.
+      if (!isVoiceConversationModeEnabled) return;
+      voiceInputRef.current?.startListening();
+    };
 
     if (!isTextToSpeechEnabled) {
       resumeListening();
@@ -137,12 +141,17 @@ export function useVoiceConversationController({
       // Guard: stop mic before speaking to prevent self-recognition.
       voiceInputRef.current?.stopListening();
       isTextToSpeechPlaybackInProgressRef.current = true;
-      await speakTextToSpeech(assistantText, { lang: speechLanguageTag });
-      await new Promise<void>((resolve) =>
-        setTimeout(resolve, POST_TEXT_TO_SPEECH_RESUME_DELAY_MILLISECONDS),
-      );
-      isTextToSpeechPlaybackInProgressRef.current = false;
-      resumeListening();
+      try {
+        await speakTextToSpeech(assistantText, { lang: speechLanguageTag });
+        await new Promise<void>((resolve) =>
+          setTimeout(resolve, POST_TEXT_TO_SPEECH_RESUME_DELAY_MILLISECONDS),
+        );
+      } catch {
+        // Guard: ignore TTS errors and keep the voice conversation loop alive.
+      } finally {
+        isTextToSpeechPlaybackInProgressRef.current = false;
+        resumeListening();
+      }
     })();
   }, [
     isAssistantStreaming,
