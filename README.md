@@ -10,8 +10,11 @@ Mastra + Groq で動く **ツール実行可能なAIエージェント**のサ�
 
 ### Prerequisites
 
-- **Node.js**: 22.x（Mastraは `>=22.13.0` を要求します。環境によっては警告が出ます）
-- **Groq API Key**: `GROQ_API_KEY`
+- **Node.js**: **>= 22.13.0**（Mastra要件）
+  - 目安: `.nvmrc` / `.node-version` に合わせてください
+- **Groq API Key**: 以下どちらか
+  - **Option A**: `.env.local` に `GROQ_API_KEY`
+  - **Option B（推奨）**: `.env.local` に `APP_CONFIG_ENCRYPTION_KEY` を入れて、起動後に Settings から API key を保存（DBに暗号化保存）
 
 ### Setup
 
@@ -23,9 +26,12 @@ npm install
 
 2. Configure env
 
-- Copy [`env.example`](env.example) → `.env.local`（もしくは `.env`）
-- Prisma 用に `DATABASE_URL` も設定してください（例: `file:./prisma/dev.db`）。
-  - 未設定の場合は `lib/prisma.ts` のフォールバックで `file:./prisma/dev.db` が使われます。
+- Copy [`env.example`](env.example) → `.env.local`（推奨）
+- Prisma 用に `DATABASE_URL` も設定してください（例: `file:./prisma/dev.db`）
+  - 未設定の場合、`lib/prisma.ts` のフォールバックで `file:./prisma/dev.db` が使われます
+  - 注意: `file:./dev.db` は **別DB** になるので避けてください（`docs/prisma-operations.md`）
+ - Option B（SettingsでAPI keyを入れる）を使うなら `APP_CONFIG_ENCRYPTION_KEY` を設定してください
+   - 生成: `npm run key:gen`
 
 例:
 
@@ -38,7 +44,7 @@ DATABASE_URL="file:./prisma/dev.db"
 3. Create/update DB
 
 ```bash
-npx prisma migrate dev
+npm run db:setup
 ```
 
 4. Run dev server
@@ -48,6 +54,15 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+> Note: `npm run dev` は安定性優先で `next dev --webpack` を使います。
+> `npm run dev:turbopack` で Turbopack も試せますが、環境によって Tailwind が反映されずレイアウトが崩れる場合があります。
+
+### “起動できた”の最低ライン（チェックリスト）
+
+- `http://localhost:3000` が表示できる
+- `http://localhost:3000/settings` が表示できる（500にならない）
+- Chatが動く（`GROQ_API_KEY` or Settingsに保存したAPI key）
 
 ## How it works
 
@@ -87,8 +102,10 @@ Settings 画面は `/api/tools`（[`app/api/tools/route.ts`](app/api/tools/route
 
 ```bash
 npm test
+npm run typecheck
 npm run build
 npm run format
+npm run db:setup
 ```
 
 > Note: `npm run build` は `next build --webpack` を使っています（環境によって Turbopack build がハングするケースがあったため）。
@@ -103,3 +120,27 @@ npm run format
 ## Notes
 
 - GroqはOpenAI互換ですが、未サポート項目があります（例: `messages[].name` 等）。Mastra側のモデルルータ（`groq/...`）を使う運用を推奨します。
+
+## Troubleshooting
+
+### Settingsが500 / `Unexpected end of JSON input`
+
+- DBが未作成 or `DATABASE_URL` が別DBを指している可能性が高いです
+- 対処:
+
+```bash
+npm run db:setup
+```
+
+### Windowsで `prisma generate` が `EPERM ... query_engine-windows.dll.node.tmp -> ...` で失敗
+
+- 対処（推奨）:
+  - dev server を止める
+  - `npm run db:generate` を実行
+  - それでもダメなら `docs/prisma-operations.md` の手順で DLL を掴んでいるプロセスを終了
+
+### SettingsでAPI keyを保存したいのにエラーになる
+
+- `APP_CONFIG_ENCRYPTION_KEY` が未設定、または形式が不正の可能性があります
+- 対処:
+  - `.env.local` に `APP_CONFIG_ENCRYPTION_KEY` を設定（生成: `npm run key:gen`）

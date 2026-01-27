@@ -38,6 +38,7 @@ export type AppConfigDTO = {
   model: string;
   enabledTools: string[];
   voiceSettings: VoiceSettingsDTO;
+  hasGroqApiKey: boolean;
 };
 
 export type ToolCatalogItem = {
@@ -109,10 +110,53 @@ export async function fetchToolCatalog(
 export async function updateSettings(
   nextConfig: AppConfigDTO,
 ): Promise<AppConfigDTO> {
+  // Guard: do not send derived / server-managed fields (e.g. `hasGroqApiKey`) back to the API.
+  const updatePayload = {
+    systemPrompt: nextConfig.systemPrompt,
+    model: nextConfig.model,
+    enabledTools: nextConfig.enabledTools,
+    voiceSettings: nextConfig.voiceSettings,
+  };
   const updateResponse = await fetch("/api/settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(nextConfig),
+    body: JSON.stringify(updatePayload),
+  });
+
+  if (updateResponse.ok) {
+    const responseBody = await readJson<unknown>(updateResponse);
+    return responseBody as AppConfigDTO;
+  }
+
+  const responseText = await updateResponse.text().catch(() => "");
+  const fallbackMessage = `Save failed (status: ${updateResponse.status})`;
+  if (!responseText.trim()) throw new Error(fallbackMessage);
+  throw new Error(responseText);
+}
+
+export async function updateGroqApiKey(groqApiKey: string): Promise<AppConfigDTO> {
+  const updateResponse = await fetch("/api/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ groqApiKey }),
+  });
+
+  if (updateResponse.ok) {
+    const responseBody = await readJson<unknown>(updateResponse);
+    return responseBody as AppConfigDTO;
+  }
+
+  const responseText = await updateResponse.text().catch(() => "");
+  const fallbackMessage = `Save failed (status: ${updateResponse.status})`;
+  if (!responseText.trim()) throw new Error(fallbackMessage);
+  throw new Error(responseText);
+}
+
+export async function clearStoredGroqApiKey(): Promise<AppConfigDTO> {
+  const updateResponse = await fetch("/api/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ clearGroqApiKey: true }),
   });
 
   if (updateResponse.ok) {

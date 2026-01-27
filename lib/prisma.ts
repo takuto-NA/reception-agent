@@ -9,8 +9,22 @@ import { PrismaClient } from "@prisma/client";
  *   In production, prefer explicit environment configuration.
  */
 const DEFAULT_SQLITE_DATABASE_URL = "file:./prisma/dev.db";
+const NON_STANDARD_SQLITE_DATABASE_URL = "file:./dev.db";
 if (!process.env.DATABASE_URL) {
   process.env.DATABASE_URL = DEFAULT_SQLITE_DATABASE_URL;
+}
+
+if (
+  process.env.NODE_ENV !== "production" &&
+  process.env.DATABASE_URL === NON_STANDARD_SQLITE_DATABASE_URL
+) {
+  console.warn(
+    [
+      "[prisma] Detected DATABASE_URL=file:./dev.db (non-standard for this repo).",
+      "[prisma] Recommended: DATABASE_URL=\"file:./prisma/dev.db\"",
+      "[prisma] See docs: docs/prisma-operations.md",
+    ].join("\n"),
+  );
 }
 
 declare global {

@@ -29,6 +29,22 @@ Windowsでは `node.exe` が Prisma Engine DLL を掴んでいて、`prisma gene
 
 ## よく使うコマンド（PowerShell）
 
+## よく使うコマンド（npm scripts / 推奨）
+
+```bash
+# DB作成/更新（開発）
+npm run db:setup
+
+# Prisma Client 再生成（WindowsのEPERM対策込み）
+npm run db:generate
+
+# 状態確認
+npm run db:status
+```
+
+> Note: Prisma CLI は `prisma.config.ts` がある場合、`.env.local` / `.env` を自動ロードしません。
+> このリポジトリでは `prisma.config.ts` 側で `.env.local` → `.env` の順にロードするようにしています。
+
 ### DBを作る / 更新する（開発）
 
 ```powershell

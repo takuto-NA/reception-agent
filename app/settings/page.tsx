@@ -3,16 +3,20 @@
 import { useEffect, useState } from "react";
 import {
   type AppConfigDTO,
+  clearStoredGroqApiKey,
   fetchSettings,
   toSettingsErrorMessage,
+  updateGroqApiKey,
   updateSettings,
 } from "./settingsApi";
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [apiKeySaving, setApiKeySaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<AppConfigDTO | null>(null);
+  const [groqApiKeyInput, setGroqApiKeyInput] = useState("");
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -53,6 +57,42 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleSaveGroqApiKey() {
+    // Guard: config not loaded yet.
+    if (!config) return;
+    const trimmedApiKey = groqApiKeyInput.trim();
+    // Guard: empty input.
+    if (!trimmedApiKey) return;
+
+    setApiKeySaving(true);
+    setError(null);
+    try {
+      const updatedConfig = await updateGroqApiKey(trimmedApiKey);
+      setConfig(updatedConfig);
+      setGroqApiKeyInput("");
+    } catch (caughtError) {
+      setError(toSettingsErrorMessage(caughtError));
+    } finally {
+      setApiKeySaving(false);
+    }
+  }
+
+  async function handleClearGroqApiKey() {
+    // Guard: config not loaded yet.
+    if (!config) return;
+    setApiKeySaving(true);
+    setError(null);
+    try {
+      const updatedConfig = await clearStoredGroqApiKey();
+      setConfig(updatedConfig);
+      setGroqApiKeyInput("");
+    } catch (caughtError) {
+      setError(toSettingsErrorMessage(caughtError));
+    } finally {
+      setApiKeySaving(false);
+    }
+  }
+
   return (
     <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/5">
       {error ? (
@@ -72,6 +112,45 @@ export default function SettingsPage() {
             </div>
           ) : (
             <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Groq API key</label>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <input
+                    value={groqApiKeyInput}
+                    onChange={(changeEvent) => setGroqApiKeyInput(changeEvent.target.value)}
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder={config.hasGroqApiKey ? "Saved (enter to update)" : "Enter API key"}
+                    className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-white/10 dark:bg-black/30 dark:focus:ring-white/20"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={apiKeySaving || !groqApiKeyInput.trim()}
+                      onClick={handleSaveGroqApiKey}
+                      className="rounded-xl bg-zinc-900 px-4 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+                    >
+                      {apiKeySaving ? "Saving…" : "Save key"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={apiKeySaving || !config.hasGroqApiKey}
+                      onClick={handleClearGroqApiKey}
+                      className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm hover:bg-zinc-50 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+                <div className="text-xs text-zinc-500">
+                  Status:{" "}
+                  <span className="font-medium">
+                    {config.hasGroqApiKey ? "Saved in DB (encrypted)" : "Not set"}
+                  </span>
+                  . Plaintext is never returned to the browser.
+                </div>
+              </div>
+
               <div className="space-y-1">
                 <label className="text-sm font-medium">Model</label>
                 <input

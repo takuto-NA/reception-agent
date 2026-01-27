@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getAppConfig, upsertAppConfig } from "@/lib/appConfig";
+import { clearGroqApiKey, getAppConfig, setGroqApiKey, upsertAppConfig } from "@/lib/appConfig";
 import { toolCatalog, type ToolKey } from "@/mastra/tools/registry";
 
 export const runtime = "nodejs";
@@ -32,6 +32,9 @@ const VOICEVOX_INTONATION_SCALE_MIN = 0.0;
 const VOICEVOX_INTONATION_SCALE_MAX = 2.0;
 const VOICEVOX_VOLUME_SCALE_MIN = 0.0;
 const VOICEVOX_VOLUME_SCALE_MAX = 2.0;
+
+const GROQ_API_KEY_MIN_LENGTH = 1;
+const GROQ_API_KEY_MAX_LENGTH = 200;
 
 const ToolKeySchema = z.enum(
   toolCatalog.map((toolCatalogItem) => toolCatalogItem.key) as [
@@ -99,6 +102,8 @@ const UpdateSchema = z
       .max(ENABLED_TOOLS_MAX_COUNT)
       .optional(),
     voiceSettings: VoiceSettingsSchema.optional(),
+    groqApiKey: z.string().min(GROQ_API_KEY_MIN_LENGTH).max(GROQ_API_KEY_MAX_LENGTH).optional(),
+    clearGroqApiKey: z.boolean().optional(),
   })
   .strict();
 
@@ -131,8 +136,36 @@ export async function PUT(request: Request) {
       );
     }
 
-    const config = await upsertAppConfig(parsed.data);
-    return Response.json(config);
+    const { groqApiKey, clearGroqApiKey: shouldClearGroqApiKey, ...configUpdate } = parsed.data;
+
+    // Guard: ambiguous request.
+    if (groqApiKey && shouldClearGroqApiKey) {
+      return Response.json(
+        { error: "Invalid request", detail: "Provide either groqApiKey or clearGroqApiKey" },
+        { status: 400 },
+      );
+    }
+
+    const hasConfigUpdate =
+      typeof configUpdate.systemPrompt !== "undefined" ||
+      typeof configUpdate.model !== "undefined" ||
+      typeof configUpdate.enabledTools !== "undefined" ||
+      typeof configUpdate.voiceSettings !== "undefined";
+
+    if (hasConfigUpdate) {
+      await upsertAppConfig(configUpdate);
+    }
+
+    if (typeof groqApiKey !== "undefined") {
+      await setGroqApiKey(groqApiKey);
+    }
+
+    if (shouldClearGroqApiKey) {
+      await clearGroqApiKey();
+    }
+
+    const nextConfig = await getAppConfig();
+    return Response.json(nextConfig);
   } catch (caughtError) {
     return Response.json(
       { error: "Failed to save settings", detail: String(caughtError) },

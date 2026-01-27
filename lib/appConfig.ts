@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { toolCatalog, type ToolKey } from "@/mastra/tools/registry";
+import { decryptAppConfigSecret, encryptAppConfigSecret } from "./appConfigEncryption";
 
 export type TextToSpeechEngine = "webSpeech" | "voicevox";
 
@@ -39,6 +40,7 @@ export type AppConfigDTO = {
   model: string;
   enabledTools: ToolKey[];
   voiceSettings: VoiceSettingsDTO;
+  hasGroqApiKey: boolean;
 };
 
 const ENABLED_TOOL_KEY_SET = new Set<ToolKey>(
@@ -51,6 +53,7 @@ const DEFAULT_TEXT_TO_SPEECH_ENGINE: TextToSpeechEngine = "webSpeech";
 const DEFAULT_VOICE_CONVERSATION_MODE_ENABLED = false;
 const DEFAULT_AUTO_SEND_ENABLED = true;
 const DEFAULT_TEXT_TO_SPEECH_ENABLED = true;
+const DEFAULT_HAS_GROQ_API_KEY = false;
 
 const DEFAULT_WEB_SPEECH_RATE = 1.0;
 const DEFAULT_WEB_SPEECH_PITCH = 1.0;
@@ -187,6 +190,7 @@ const DEFAULTS: AppConfigDTO = {
       volumeScale: DEFAULT_VOICEVOX_VOLUME_SCALE,
     },
   },
+  hasGroqApiKey: DEFAULT_HAS_GROQ_API_KEY,
 };
 
 export async function getAppConfig(): Promise<AppConfigDTO> {
@@ -194,11 +198,13 @@ export async function getAppConfig(): Promise<AppConfigDTO> {
   if (!row) return DEFAULTS;
   const enabledTools = parseEnabledToolsJson(row.enabledTools);
   const voiceSettings = parseVoiceSettingsJson(row.voiceSettings);
+  const hasGroqApiKey = Boolean(row.groqApiKeyEncrypted?.trim());
   return {
     systemPrompt: row.systemPrompt,
     model: row.model,
     enabledTools,
     voiceSettings,
+    hasGroqApiKey,
   };
 }
 
@@ -209,6 +215,8 @@ export async function upsertAppConfig(input: Partial<AppConfigDTO>) {
     model: input.model ?? current.model,
     enabledTools: input.enabledTools ?? current.enabledTools,
     voiceSettings: input.voiceSettings ?? current.voiceSettings,
+    // Guard: API key is managed via dedicated endpoints and is never echoed back as plaintext.
+    hasGroqApiKey: current.hasGroqApiKey,
   };
 
   await prisma.appConfig.upsert({
@@ -229,4 +237,59 @@ export async function upsertAppConfig(input: Partial<AppConfigDTO>) {
   });
 
   return next;
+}
+
+export async function setGroqApiKey(plaintextGroqApiKey: string) {
+  // Guard: refuse empty input.
+  if (!plaintextGroqApiKey.trim()) {
+    throw new Error("Groq API key must be non-empty");
+  }
+
+  const encrypted = encryptAppConfigSecret(plaintextGroqApiKey.trim());
+
+  await prisma.appConfig.upsert({
+    where: { id: "default" },
+    create: {
+      id: "default",
+      systemPrompt: DEFAULTS.systemPrompt,
+      model: DEFAULTS.model,
+      enabledTools: DEFAULTS.enabledTools,
+      voiceSettings: DEFAULTS.voiceSettings,
+      groqApiKeyEncrypted: encrypted,
+    },
+    update: {
+      groqApiKeyEncrypted: encrypted,
+    },
+  });
+}
+
+export async function clearGroqApiKey() {
+  await prisma.appConfig.upsert({
+    where: { id: "default" },
+    create: {
+      id: "default",
+      systemPrompt: DEFAULTS.systemPrompt,
+      model: DEFAULTS.model,
+      enabledTools: DEFAULTS.enabledTools,
+      voiceSettings: DEFAULTS.voiceSettings,
+      groqApiKeyEncrypted: null,
+    },
+    update: {
+      groqApiKeyEncrypted: null,
+    },
+  });
+}
+
+export async function resolveGroqApiKey(): Promise<string | null> {
+  const row = await prisma.appConfig.findUnique({
+    where: { id: "default" },
+    select: { groqApiKeyEncrypted: true },
+  });
+
+  const encrypted = row?.groqApiKeyEncrypted?.trim();
+  if (encrypted) {
+    return decryptAppConfigSecret(encrypted);
+  }
+
+  return process.env.GROQ_API_KEY ?? null;
 }

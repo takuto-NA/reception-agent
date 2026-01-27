@@ -2,17 +2,27 @@
   "name": "reception-agent",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
+    "dev:turbopack": "next dev",
+    "dev:webpack": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:migrate": "prisma migrate dev",
-    "db:generate": "prisma generate"
+    "db:migrate": "node scripts/prisma.mjs migrate dev",
+    "db:deploy": "node scripts/prisma.mjs migrate deploy",
+    "db:status": "node scripts/prisma.mjs migrate status",
+    "db:generate": "node scripts/prisma.mjs generate",
+    "db:setup": "node scripts/prisma.mjs migrate dev && node scripts/prisma.mjs generate",
+    "key:gen": "node scripts/generate-encryption-key.mjs"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.50",
@@ -39,6 +49,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.1.4",
     "happy-dom": "^20.3.7",
