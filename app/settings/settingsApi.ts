@@ -48,6 +48,17 @@ export type ToolCatalogItem = {
 };
 
 type ToolsResponseBody = { tools: ToolCatalogItem[] };
+type ApiErrorResponse = {
+  error?: string;
+  detail?: string;
+  code?: string;
+};
+
+const SETTINGS_ERROR_CODE_MESSAGE_MAP: Record<string, string> = {
+  DB_SCHEMA_MISMATCH:
+    "Database schema mismatch. Run `npm run db:setup` and confirm DATABASE_URL is file:./prisma/dev.db.",
+  INVALID_JSON: "Invalid JSON request. Refresh the page and try again.",
+};
 
 function getErrorMessage(caughtError: unknown): string {
   if (caughtError instanceof Error) return caughtError.message;
@@ -66,29 +77,36 @@ async function readJson<ResponseBody>(
   }
 }
 
+function mapSettingsApiError(responseBody: ApiErrorResponse | null): string | null {
+  if (!responseBody?.code) return null;
+  const mappedMessage = SETTINGS_ERROR_CODE_MESSAGE_MAP[responseBody.code];
+  return mappedMessage ?? null;
+}
+
+async function readSettingsApiError(response: Response): Promise<string> {
+  const fallbackMessage = `Load failed (status: ${response.status})`;
+  const responseText = await response.text().catch(() => "");
+  if (!responseText.trim()) return fallbackMessage;
+
+  try {
+    const parsedJson = JSON.parse(responseText) as ApiErrorResponse;
+    const mappedMessage = mapSettingsApiError(parsedJson);
+    if (mappedMessage) return mappedMessage;
+    if (parsedJson?.error) return String(parsedJson.error);
+    return fallbackMessage;
+  } catch {
+    return responseText;
+  }
+}
+
 export async function fetchSettings(signal?: AbortSignal): Promise<AppConfigDTO> {
   const response = await fetch("/api/settings", { signal });
   if (response.ok) {
     const responseBody = await readJson<unknown>(response);
     return responseBody as AppConfigDTO;
   }
-
-  const responseText = await response.text().catch(() => "");
-  const fallbackMessage = `Load failed (status: ${response.status})`;
-  if (!responseText.trim()) throw new Error(fallbackMessage);
-
-  try {
-    const parsedJson = JSON.parse(responseText) as unknown;
-    const errorText =
-      typeof parsedJson === "object" &&
-      parsedJson !== null &&
-      "error" in parsedJson
-        ? String((parsedJson as { error?: unknown }).error)
-        : fallbackMessage;
-    throw new Error(errorText);
-  } catch {
-    throw new Error(responseText);
-  }
+  const errorMessage = await readSettingsApiError(response);
+  throw new Error(errorMessage);
 }
 
 export async function fetchToolCatalog(
@@ -127,11 +145,18 @@ export async function updateSettings(
     const responseBody = await readJson<unknown>(updateResponse);
     return responseBody as AppConfigDTO;
   }
-
-  const responseText = await updateResponse.text().catch(() => "");
   const fallbackMessage = `Save failed (status: ${updateResponse.status})`;
+  const responseText = await updateResponse.text().catch(() => "");
   if (!responseText.trim()) throw new Error(fallbackMessage);
-  throw new Error(responseText);
+  try {
+    const parsedJson = JSON.parse(responseText) as ApiErrorResponse;
+    const mappedMessage = mapSettingsApiError(parsedJson);
+    if (mappedMessage) throw new Error(mappedMessage);
+    if (parsedJson?.error) throw new Error(String(parsedJson.error));
+    throw new Error(fallbackMessage);
+  } catch {
+    throw new Error(responseText);
+  }
 }
 
 export async function updateGroqApiKey(groqApiKey: string): Promise<AppConfigDTO> {
@@ -145,11 +170,18 @@ export async function updateGroqApiKey(groqApiKey: string): Promise<AppConfigDTO
     const responseBody = await readJson<unknown>(updateResponse);
     return responseBody as AppConfigDTO;
   }
-
-  const responseText = await updateResponse.text().catch(() => "");
   const fallbackMessage = `Save failed (status: ${updateResponse.status})`;
+  const responseText = await updateResponse.text().catch(() => "");
   if (!responseText.trim()) throw new Error(fallbackMessage);
-  throw new Error(responseText);
+  try {
+    const parsedJson = JSON.parse(responseText) as ApiErrorResponse;
+    const mappedMessage = mapSettingsApiError(parsedJson);
+    if (mappedMessage) throw new Error(mappedMessage);
+    if (parsedJson?.error) throw new Error(String(parsedJson.error));
+    throw new Error(fallbackMessage);
+  } catch {
+    throw new Error(responseText);
+  }
 }
 
 export async function clearStoredGroqApiKey(): Promise<AppConfigDTO> {
@@ -163,11 +195,18 @@ export async function clearStoredGroqApiKey(): Promise<AppConfigDTO> {
     const responseBody = await readJson<unknown>(updateResponse);
     return responseBody as AppConfigDTO;
   }
-
-  const responseText = await updateResponse.text().catch(() => "");
   const fallbackMessage = `Save failed (status: ${updateResponse.status})`;
+  const responseText = await updateResponse.text().catch(() => "");
   if (!responseText.trim()) throw new Error(fallbackMessage);
-  throw new Error(responseText);
+  try {
+    const parsedJson = JSON.parse(responseText) as ApiErrorResponse;
+    const mappedMessage = mapSettingsApiError(parsedJson);
+    if (mappedMessage) throw new Error(mappedMessage);
+    if (parsedJson?.error) throw new Error(String(parsedJson.error));
+    throw new Error(fallbackMessage);
+  } catch {
+    throw new Error(responseText);
+  }
 }
 
 export function toSettingsErrorMessage(caughtError: unknown): string {

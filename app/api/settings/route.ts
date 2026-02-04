@@ -36,6 +36,41 @@ const VOICEVOX_VOLUME_SCALE_MAX = 2.0;
 const GROQ_API_KEY_MIN_LENGTH = 1;
 const GROQ_API_KEY_MAX_LENGTH = 200;
 
+const ERROR_CODE_DB_SCHEMA_MISMATCH = "DB_SCHEMA_MISMATCH";
+const ERROR_CODE_INVALID_JSON = "INVALID_JSON";
+
+function toSettingsErrorResponse(caughtError: unknown) {
+  /**
+   * Responsibility:
+   * - Normalize server errors into a structured payload for the UI.
+   */
+  const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+  if (message.includes("AppConfig.groqApiKeyEncrypted") && message.includes("does not exist")) {
+    return {
+      error: "Database schema mismatch",
+      detail: message,
+      code: ERROR_CODE_DB_SCHEMA_MISMATCH,
+    };
+  }
+  return { error: "Failed to load settings", detail: message };
+}
+
+function toSettingsSaveErrorResponse(caughtError: unknown) {
+  /**
+   * Responsibility:
+   * - Normalize save errors into a structured payload for the UI.
+   */
+  const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+  if (message.includes("AppConfig.groqApiKeyEncrypted") && message.includes("does not exist")) {
+    return {
+      error: "Database schema mismatch",
+      detail: message,
+      code: ERROR_CODE_DB_SCHEMA_MISMATCH,
+    };
+  }
+  return { error: "Failed to save settings", detail: message };
+}
+
 const ToolKeySchema = z.enum(
   toolCatalog.map((toolCatalogItem) => toolCatalogItem.key) as [
     ToolKey,
@@ -112,10 +147,7 @@ export async function GET() {
     const config = await getAppConfig();
     return Response.json(config);
   } catch (caughtError) {
-    return Response.json(
-      { error: "Failed to load settings", detail: String(caughtError) },
-      { status: 500 },
-    );
+    return Response.json(toSettingsErrorResponse(caughtError), { status: 500 });
   }
 }
 
@@ -124,7 +156,10 @@ export async function PUT(request: Request) {
     const requestBody = await request.json().catch(() => null);
     // Guard: invalid JSON.
     if (!requestBody) {
-      return Response.json({ error: "Invalid JSON" }, { status: 400 });
+      return Response.json(
+        { error: "Invalid JSON", code: ERROR_CODE_INVALID_JSON },
+        { status: 400 },
+      );
     }
 
     const parsed = UpdateSchema.safeParse(requestBody);
@@ -167,9 +202,6 @@ export async function PUT(request: Request) {
     const nextConfig = await getAppConfig();
     return Response.json(nextConfig);
   } catch (caughtError) {
-    return Response.json(
-      { error: "Failed to save settings", detail: String(caughtError) },
-      { status: 500 },
-    );
+    return Response.json(toSettingsSaveErrorResponse(caughtError), { status: 500 });
   }
 }

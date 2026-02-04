@@ -12,9 +12,11 @@ Mastra + Groq で動く **ツール実行可能なAIエージェント**のサ�
 
 - **Node.js**: **>= 22.13.0**（Mastra要件）
   - 目安: `.nvmrc` / `.node-version` に合わせてください
-- **Groq API Key**: 以下どちらか
-  - **Option A**: `.env.local` に `GROQ_API_KEY`
-  - **Option B（推奨）**: `.env.local` に `APP_CONFIG_ENCRYPTION_KEY` を入れて、起動後に Settings から API key を保存（DBに暗号化保存）
+- **LMSTUDIO または Groq**（どちらか）
+  - **LMSTUDIO**: `http://127.0.0.1:1234` で OpenAI互換APIを起動
+  - **Groq**: API Key を用意（以下の Option A/B）
+    - **Option A**: `.env.local` に `GROQ_API_KEY`
+    - **Option B（推奨）**: `.env.local` に `APP_CONFIG_ENCRYPTION_KEY` を入れて、起動後に Settings から API key を保存（DBに暗号化保存）
 
 ### Setup
 
@@ -33,7 +35,16 @@ npm install
  - Option B（SettingsでAPI keyを入れる）を使うなら `APP_CONFIG_ENCRYPTION_KEY` を設定してください
    - 生成: `npm run key:gen`
 
-例:
+例（LMSTUDIO）:
+
+```bash
+LMSTUDIO_BASE_URL=http://127.0.0.1:1234
+LMSTUDIO_API_KEY=lm-studio
+GROQ_MODEL=lmstudio/lfm2-8b-a1b
+DATABASE_URL="file:./prisma/dev.db"
+```
+
+例（Groq）:
 
 ```bash
 GROQ_API_KEY=...
@@ -62,7 +73,15 @@ Open `http://localhost:3000`.
 
 - `http://localhost:3000` が表示できる
 - `http://localhost:3000/settings` が表示できる（500にならない）
-- Chatが動く（`GROQ_API_KEY` or Settingsに保存したAPI key）
+- Chatが動く（LMSTUDIO または Groq で応答が返る）
+
+### 初回起動チェックリスト（詰まり回避）
+
+- `.env.local` が存在する（`env.example` をコピー）
+- `DATABASE_URL="file:./prisma/dev.db"` に設定済み
+- `npm run db:setup` 実行済み
+- LMSTUDIO利用時: `LMSTUDIO_BASE_URL=http://127.0.0.1:1234` と `GROQ_MODEL=lmstudio/<model>`
+- Groq利用時: `GROQ_API_KEY` を設定、もしくは Settings で保存
 
 ## How it works
 

@@ -293,3 +293,46 @@ export async function resolveGroqApiKey(): Promise<string | null> {
 
   return process.env.GROQ_API_KEY ?? null;
 }
+
+/**
+ * Responsibility:
+ * - Resolve LMSTUDIO configuration from environment variables.
+ *
+ * Returns:
+ * - Base URL and API key for LMSTUDIO, or null if not configured.
+ */
+export function resolveLmStudioConfig(): {
+  baseUrl: string;
+  apiKey: string;
+} | null {
+  const baseUrl = process.env.LMSTUDIO_BASE_URL?.trim();
+  // Guard: base URL is required for LMSTUDIO.
+  if (!baseUrl) {
+    return null;
+  }
+
+  // Guard: validate URL format.
+  try {
+    new URL(baseUrl);
+  } catch {
+    return null;
+  }
+
+  const apiKey = process.env.LMSTUDIO_API_KEY?.trim() ?? "lm-studio";
+
+  return {
+    baseUrl,
+    apiKey,
+  };
+}
+
+/**
+ * Responsibility:
+ * - Check if a model identifier uses LMSTUDIO provider.
+ *
+ * Returns:
+ * - true if model starts with "lmstudio/" prefix.
+ */
+export function isLmStudioModel(model: string): boolean {
+  return model.toLowerCase().startsWith("lmstudio/");
+}

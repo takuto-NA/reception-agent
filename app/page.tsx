@@ -37,6 +37,10 @@ const DEFAULT_TEXT_TO_SPEECH_SETTINGS: TextToSpeechSettings = {
 // UI readability constants (avoid burying critical layout intent in strings).
 const CHAT_SCROLL_MAX_HEIGHT_CLASS = "max-h-[60vh]";
 const CHAT_MESSAGE_MAX_WIDTH_CLASS = "max-w-[85%]";
+const FIRST_RUN_DATABASE_URL = "file:./prisma/dev.db";
+const FIRST_RUN_MODEL_LMSTUDIO = "lmstudio/lfm2-8b-a1b";
+const FIRST_RUN_MODEL_GROQ = "groq/llama-3.3-70b-versatile";
+const FIRST_RUN_LMSTUDIO_URL = "http://127.0.0.1:1234";
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -167,8 +171,31 @@ export default function Home() {
       <section className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">Chat</h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-300">
-          Streaming chat powered by Mastra + Groq.
+          Streaming chat powered by Mastra + LMSTUDIO/Groq.
         </p>
+        {settingsLoadError ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-100">
+            <div className="font-medium">First-run setup required</div>
+            <div className="mt-1 text-xs text-amber-900/80 dark:text-amber-100/80">
+              Settings failed to load. Complete the checklist below and refresh this page.
+            </div>
+            <div className="mt-3 space-y-2 text-xs">
+              <div>
+                1) Copy <code>env.example</code> to <code>.env.local</code> and set
+                <code>DATABASE_URL=&quot;{FIRST_RUN_DATABASE_URL}&quot;</code>.
+              </div>
+              <div>2) Run <code>npm run db:setup</code> to initialize the DB.</div>
+              <div>
+                3) For LMSTUDIO set <code>LMSTUDIO_BASE_URL={FIRST_RUN_LMSTUDIO_URL}</code> and
+                model <code>{FIRST_RUN_MODEL_LMSTUDIO}</code>. For Groq use model{" "}
+                <code>{FIRST_RUN_MODEL_GROQ}</code>.
+              </div>
+              <div>
+                4) Open <a className="underline" href="/settings">Settings</a> to confirm.
+              </div>
+            </div>
+          </div>
+        ) : null}
         {settingsLoadError ? (
           <div className="text-sm text-red-600 dark:text-red-400">
             Settings load failed: {settingsLoadError}
@@ -177,6 +204,9 @@ export default function Home() {
         {error ? (
           <div className="text-sm text-red-600 dark:text-red-400">
             {getErrorMessage(error)}
+            <div className="mt-1 text-xs text-red-600/80 dark:text-red-300/80">
+              Check that the model is valid and the provider server is running.
+            </div>
           </div>
         ) : null}
       </section>

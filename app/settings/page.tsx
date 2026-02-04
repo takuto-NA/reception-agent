@@ -10,6 +10,32 @@ import {
   updateSettings,
 } from "./settingsApi";
 
+const MODEL_PREFIX_LMSTUDIO = "lmstudio/";
+const MODEL_PREFIX_GROQ = "groq/";
+const MODEL_EXAMPLE_LMSTUDIO = "lmstudio/lfm2-8b-a1b";
+const MODEL_EXAMPLE_GROQ = "groq/llama-3.3-70b-versatile";
+const FIRST_RUN_DATABASE_URL = "file:./prisma/dev.db";
+const FIRST_RUN_LMSTUDIO_URL = "http://127.0.0.1:1234";
+
+function getModelGuidance(modelValue: string): string {
+  const trimmedModel = modelValue.trim();
+  if (!trimmedModel) return "Enter a model id. Example: groq/llama-3.3-70b-versatile";
+  if (trimmedModel.startsWith(MODEL_PREFIX_LMSTUDIO)) {
+    return "LMSTUDIO model detected. Ensure LMSTUDIO_BASE_URL is set and server is running.";
+  }
+  if (trimmedModel.startsWith(MODEL_PREFIX_GROQ)) {
+    return "Groq model detected. Ensure GROQ_API_KEY is configured.";
+  }
+  return "Model prefix should be lmstudio/ or groq/.";
+}
+
+function isModelPrefixValid(modelValue: string): boolean {
+  const trimmedModel = modelValue.trim();
+  if (!trimmedModel) return false;
+  if (trimmedModel.startsWith(MODEL_PREFIX_LMSTUDIO)) return true;
+  if (trimmedModel.startsWith(MODEL_PREFIX_GROQ)) return true;
+  return false;
+}
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -112,6 +138,26 @@ export default function SettingsPage() {
             </div>
           ) : (
             <div className="space-y-4">
+              <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200">
+                <div className="font-medium">Setup checklist</div>
+                <div className="mt-2 space-y-1 text-xs text-zinc-600 dark:text-zinc-300">
+                  <div>
+                    Database:{" "}
+                    <span className="font-medium">
+                      {error ? "Failed to load" : "Loaded"}
+                    </span>
+                  </div>
+                  <div>
+                    <code>.env.local</code> should include{" "}
+                    <code>DATABASE_URL=&quot;{FIRST_RUN_DATABASE_URL}&quot;</code>.
+                  </div>
+                  <div>
+                    For LMSTUDIO set <code>LMSTUDIO_BASE_URL={FIRST_RUN_LMSTUDIO_URL}</code>.
+                  </div>
+                  <div>Run <code>npm run db:setup</code> after changing DB settings.</div>
+                </div>
+              </div>
+
               <div className="space-y-1">
                 <label className="text-sm font-medium">Groq API key</label>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -165,8 +211,42 @@ export default function SettingsPage() {
                   placeholder="groq/llama-3.3-70b-versatile"
                   className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-white/10 dark:bg-black/30 dark:focus:ring-white/20"
                 />
-                <div className="text-xs text-zinc-500">
-                  Example: <code>groq/llama-3.3-70b-versatile</code>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <button
+                    type="button"
+                    className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/10"
+                    onClick={() =>
+                      setConfig((previousConfig) => {
+                        // Guard: state should exist here.
+                        if (!previousConfig) return previousConfig;
+                        return { ...previousConfig, model: MODEL_EXAMPLE_LMSTUDIO };
+                      })
+                    }
+                  >
+                    Use LMSTUDIO default
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/10"
+                    onClick={() =>
+                      setConfig((previousConfig) => {
+                        // Guard: state should exist here.
+                        if (!previousConfig) return previousConfig;
+                        return { ...previousConfig, model: MODEL_EXAMPLE_GROQ };
+                      })
+                    }
+                  >
+                    Use Groq default
+                  </button>
+                </div>
+                <div
+                  className={`text-xs ${
+                    isModelPrefixValid(config.model)
+                      ? "text-zinc-500"
+                      : "text-amber-700 dark:text-amber-300"
+                  }`}
+                >
+                  {getModelGuidance(config.model)}
                 </div>
               </div>
 
