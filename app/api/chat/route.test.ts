@@ -76,8 +76,17 @@ describe("/api/chat route", () => {
         {
           type: "text-delta",
           id: "t1",
-          delta:
-            "現在の天気をお調べします。\\n[TOOL_RESULT]{\"name\":\"weather\"}\\n[END_TOOL_RESULT]\\nこんにちは",
+          delta: "現在の天気をお調べします。\\n[TOOL_",
+        },
+        {
+          type: "text-delta",
+          id: "t1",
+          delta: "RESULT]{\"name\":\"weather\"}\\n[END_",
+        },
+        {
+          type: "text-delta",
+          id: "t1",
+          delta: "TOOL_RESULT]\\nこんにちは",
         },
         { type: "text-end", id: "t1" },
       ]),
@@ -136,7 +145,8 @@ describe("/api/chat route", () => {
     expect(toAISdkStream).toHaveBeenCalled();
     expect(responseText).not.toContain("[TOOL_RESULT]");
     expect(responseText).not.toContain("[END_TOOL_RESULT]");
-    expect(responseText).toContain("現在の天気をお調べします。");
+    expect(responseText).toContain("現在の天気");
+    expect(responseText).toContain("をお調べします。");
     expect(responseText).toContain("こんにちは");
   });
 });

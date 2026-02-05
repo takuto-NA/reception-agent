@@ -157,46 +157,114 @@ function sanitizeUiMessageStream(
    *
    * Notes:
    * - We only sanitize text deltas. Non-text chunks are forwarded as-is.
+   * - Streaming can split marker strings across chunks; we must handle cross-chunk markers.
    */
   let isInToolLogBlock = false;
+  const markerStart = TOOL_LOG_BLOCK_START_MARKER;
+  const markerEnd = TOOL_LOG_BLOCK_END_MARKER;
+  const markerScanTailLength = Math.max(markerStart.length, markerEnd.length) - 1;
+  let carry = "";
+  let activeTextId: string | null = null;
+  let isTextOpen = false;
+
+  function dropPartialMarkerSuffix(value: string): string {
+    /**
+     * Responsibility:
+     * - Remove a trailing partial marker (prefix of start/end) to avoid leaking it on stream end.
+     */
+    if (!value) return value;
+    for (let position = 0; position < value.length; position += 1) {
+      const suffix = value.slice(position);
+      if (markerStart.startsWith(suffix) || markerEnd.startsWith(suffix)) {
+        return value.slice(0, position);
+      }
+    }
+    return value;
+  }
+
   return stream.pipeThrough(
     new TransformStream<UIMessageChunk, UIMessageChunk>({
       transform(chunk, controller) {
+        if (chunk.type === "text-start") {
+          activeTextId = chunk.id;
+          isTextOpen = true;
+          controller.enqueue(chunk);
+          return;
+        }
+
+        if (chunk.type === "text-end") {
+          // Guard: flush remaining safe carry before ending the text part.
+          if (isTextOpen && activeTextId === chunk.id && !isInToolLogBlock) {
+            const safeCarry = dropPartialMarkerSuffix(carry);
+            carry = "";
+            if (safeCarry) {
+              controller.enqueue({
+                type: "text-delta",
+                id: chunk.id,
+                delta: safeCarry,
+              });
+            }
+          }
+          controller.enqueue(chunk);
+          if (activeTextId === chunk.id) {
+            isTextOpen = false;
+            activeTextId = null;
+          }
+          return;
+        }
+
         if (chunk.type !== "text-delta") {
           controller.enqueue(chunk);
           return;
         }
 
-        let delta = chunk.delta;
-        while (delta.length > 0) {
+        let combined = carry + chunk.delta;
+        carry = "";
+
+        while (combined.length > 0) {
           if (isInToolLogBlock) {
-            const endIndex = delta.indexOf(TOOL_LOG_BLOCK_END_MARKER);
+            const endIndex = combined.indexOf(markerEnd);
             if (endIndex === -1) {
-              // Guard: still inside tool block; drop all.
+              // Guard: still inside tool block; keep small tail to detect end marker.
+              if (combined.length > markerScanTailLength) {
+                carry = combined.slice(-markerScanTailLength);
+              } else {
+                carry = combined;
+              }
               return;
             }
-            delta = delta.slice(endIndex + TOOL_LOG_BLOCK_END_MARKER.length);
+
+            combined = combined.slice(endIndex + markerEnd.length);
             isInToolLogBlock = false;
             continue;
           }
 
-          const startIndex = delta.indexOf(TOOL_LOG_BLOCK_START_MARKER);
+          const startIndex = combined.indexOf(markerStart);
           if (startIndex === -1) {
-            break;
+            // Guard: no marker start found; emit safe content and keep tail.
+            if (combined.length <= markerScanTailLength) {
+              carry = combined;
+              return;
+            }
+            const safeText = combined.slice(0, combined.length - markerScanTailLength);
+            carry = combined.slice(combined.length - markerScanTailLength);
+            controller.enqueue({ ...chunk, delta: safeText });
+            return;
           }
 
-          const before = delta.slice(0, startIndex);
+          const before = combined.slice(0, startIndex);
           if (before) {
             controller.enqueue({ ...chunk, delta: before });
           }
-          delta = delta.slice(startIndex + TOOL_LOG_BLOCK_START_MARKER.length);
+          combined = combined.slice(startIndex + markerStart.length);
           isInToolLogBlock = true;
         }
-
-        // Guard: trailing non-tool content.
-        if (!isInToolLogBlock && delta) {
-          controller.enqueue({ ...chunk, delta });
-        }
+      },
+      flush() {
+        // Note:
+        // - We intentionally do not emit extra chunks here.
+        // - Emitting a new text-delta without a matching text-start breaks the UI stream protocol.
+        // - Remaining carry is flushed on 'text-end' with the correct id.
       },
     }),
   );
