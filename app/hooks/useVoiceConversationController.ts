@@ -7,8 +7,8 @@
  * - The caller owns message rendering and the mic button behavior.
  */
 
-import { useEffect, useRef } from "react";
-import type { VoiceInputHandle } from "./VoiceInput";
+import { useEffect, useMemo, useRef } from "react";
+import type { VoiceInputHandle } from "../components/VoiceInput";
 
 type UiMessagePart =
   | { type: "text"; text: string }
@@ -38,6 +38,8 @@ type Params = {
   speakTextToSpeech: SpeakTextToSpeech;
 };
 
+const POST_TEXT_TO_SPEECH_RESUME_DELAY_MILLISECONDS = 600;
+
 function extractMessageText(message: UiMessageLike): string {
   const parts = message.parts;
   if (Array.isArray(parts) && parts.length > 0) {
@@ -66,11 +68,14 @@ export function useVoiceConversationController({
   const lastHandledAssistantMessageIdRef = useRef<string | null>(null);
   const isTextToSpeechPlaybackInProgressRef = useRef(false);
 
-  const POST_TEXT_TO_SPEECH_RESUME_DELAY_MILLISECONDS = 600;
-
-  function getLastAssistantMessage(): UiMessageLike | undefined {
+  const lastAssistantMessage = useMemo<UiMessageLike | undefined>(() => {
     return [...messages].reverse().find((message) => message.role === "assistant");
-  }
+  }, [messages]);
+
+  const lastAssistantMessageId = lastAssistantMessage?.id ?? null;
+  const hasUnhandledAssistantMessage =
+    Boolean(lastAssistantMessageId) &&
+    lastHandledAssistantMessageIdRef.current !== lastAssistantMessageId;
 
   useEffect(() => {
     // Guard: voice conversation mode is disabled.
@@ -84,23 +89,17 @@ export function useVoiceConversationController({
     const isTextToSpeechPotentiallyAvailable =
       isTextToSpeechEnabled && isTextToSpeechSupported !== false;
     if (isTextToSpeechPotentiallyAvailable) {
-      const lastAssistantMessage = getLastAssistantMessage();
-      const lastAssistantMessageId = lastAssistantMessage?.id;
-      const hasUnhandledAssistantMessage =
-        Boolean(lastAssistantMessageId) &&
-        lastHandledAssistantMessageIdRef.current !== lastAssistantMessageId;
-
       // Guard: about to read the assistant message; don't start mic now.
       if (hasUnhandledAssistantMessage) return;
     }
 
     voiceInputRef.current?.startListening();
   }, [
+    hasUnhandledAssistantMessage,
     isAssistantStreaming,
     isTextToSpeechEnabled,
     isTextToSpeechSupported,
     isVoiceConversationModeEnabled,
-    messages,
     voiceInputRef,
   ]);
 
@@ -109,17 +108,14 @@ export function useVoiceConversationController({
     if (isAssistantStreaming) return;
     // Guard: voice conversation mode is disabled.
     if (!isVoiceConversationModeEnabled) return;
-
-    const lastAssistantMessage = getLastAssistantMessage();
     // Guard: no assistant message yet.
-    if (!lastAssistantMessage?.id) return;
+    if (!lastAssistantMessageId) return;
     // Guard: already handled this assistant message.
-    if (lastHandledAssistantMessageIdRef.current === lastAssistantMessage.id)
-      return;
+    if (lastHandledAssistantMessageIdRef.current === lastAssistantMessageId) return;
 
-    lastHandledAssistantMessageIdRef.current = lastAssistantMessage.id;
+    lastHandledAssistantMessageIdRef.current = lastAssistantMessageId;
 
-    const assistantText = extractMessageText(lastAssistantMessage);
+    const assistantText = extractMessageText(lastAssistantMessage ?? {});
     const resumeListening = () => {
       // Guard: voice conversation mode is disabled.
       if (!isVoiceConversationModeEnabled) return;
@@ -158,9 +154,11 @@ export function useVoiceConversationController({
     isTextToSpeechEnabled,
     isTextToSpeechSupported,
     isVoiceConversationModeEnabled,
-    messages,
+    lastAssistantMessage,
+    lastAssistantMessageId,
     speakTextToSpeech,
     speechLanguageTag,
     voiceInputRef,
   ]);
 }
+

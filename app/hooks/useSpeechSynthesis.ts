@@ -16,6 +16,9 @@ type SpeakOptions = {
 };
 
 const DEFAULT_SPEECH_SYNTHESIS_LANGUAGE_TAG = "ja-JP";
+const DEFAULT_SPEECH_SYNTHESIS_RATE = 1.0;
+const DEFAULT_SPEECH_SYNTHESIS_PITCH = 1.0;
+const DEFAULT_SPEECH_SYNTHESIS_VOLUME = 1.0;
 
 export function useSpeechSynthesis() {
   const [isSupported, setIsSupported] = useState<boolean | null>(null);
@@ -23,9 +26,8 @@ export function useSpeechSynthesis() {
 
   useEffect(() => {
     // Guard: detect browser API only on the client.
-    setIsSupported(
-      typeof window !== "undefined" && "speechSynthesis" in window,
-    );
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Client-only API detection after mount.
+    setIsSupported(typeof window !== "undefined" && "speechSynthesis" in window);
   }, []);
 
   const cancel = useCallback(() => {
@@ -48,14 +50,10 @@ export function useSpeechSynthesis() {
         const utterance = new SpeechSynthesisUtterance(text);
         currentUtteranceRef.current = utterance;
 
-        const DEFAULT_RATE = 1.0;
-        const DEFAULT_PITCH = 1.0;
-        const DEFAULT_VOLUME = 1.0;
-
         utterance.lang = options?.lang ?? DEFAULT_SPEECH_SYNTHESIS_LANGUAGE_TAG;
-        utterance.rate = options?.rate ?? DEFAULT_RATE;
-        utterance.pitch = options?.pitch ?? DEFAULT_PITCH;
-        utterance.volume = options?.volume ?? DEFAULT_VOLUME;
+        utterance.rate = options?.rate ?? DEFAULT_SPEECH_SYNTHESIS_RATE;
+        utterance.pitch = options?.pitch ?? DEFAULT_SPEECH_SYNTHESIS_PITCH;
+        utterance.volume = options?.volume ?? DEFAULT_SPEECH_SYNTHESIS_VOLUME;
 
         utterance.onend = () => {
           if (currentUtteranceRef.current === utterance) {
@@ -78,3 +76,4 @@ export function useSpeechSynthesis() {
 
   return { isSupported, speak, cancel };
 }
+

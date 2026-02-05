@@ -7,11 +7,11 @@ import { VoiceInput, type VoiceInputHandle } from "./components/VoiceInput";
 import {
   useTextToSpeech,
   type TextToSpeechSettings,
-} from "./components/useTextToSpeech";
+} from "./hooks/useTextToSpeech";
 import {
   type UiMessageLike,
   useVoiceConversationController,
-} from "./components/useVoiceConversationController";
+} from "./hooks/useVoiceConversationController";
 import {
   fetchSettings,
   toSettingsErrorMessage,

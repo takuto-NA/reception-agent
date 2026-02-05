@@ -1,10 +1,12 @@
 ## Reception Agent
 
-Mastra + Groq で動く **ツール実行可能なAIエージェント**のサンプルWebアプリです。
+Mastra + (LMSTUDIO / Groq) で動く **ツール実行可能なAIエージェント**のサンプルWebアプリです。
 
 - **Chat**: ストリーミング応答（`/api/chat`）
-- **Settings**: 人格（system prompt）/モデル/ツール有効化をUIから編集（SQLite + Prisma）
+- **Settings**: system prompt / model / ツール有効化をUIから編集（SQLite + Prisma）
 - **Voice input**: ブラウザの Web Speech API で音声入力（対応ブラウザのみ）
+
+詳細な設計・運用・拡張手順は `docs/` に集約しています（READMEは入口に徹します）。
 
 ## Getting Started
 
@@ -29,18 +31,16 @@ npm install
 2. Configure env
 
 - Copy [`env.example`](env.example) → `.env.local`（推奨）
-- Prisma 用に `DATABASE_URL` も設定してください（例: `file:./prisma/dev.db`）
-  - 未設定の場合、`lib/prisma.ts` のフォールバックで `file:./prisma/dev.db` が使われます
-  - 注意: `file:./dev.db` は **別DB** になるので避けてください（`docs/prisma-operations.md`）
- - Option B（SettingsでAPI keyを入れる）を使うなら `APP_CONFIG_ENCRYPTION_KEY` を設定してください
-   - 生成: `npm run key:gen`
+- `DATABASE_URL="file:./prisma/dev.db"` を設定（DBまわりの詳細は [`docs/prisma-operations.md`](docs/prisma-operations.md)）
+- Option B（SettingsでAPI keyを入れる）を使うなら `APP_CONFIG_ENCRYPTION_KEY` を設定
+  - 生成: `npm run key:gen`
 
 例（LMSTUDIO）:
 
 ```bash
 LMSTUDIO_BASE_URL=http://127.0.0.1:1234
 LMSTUDIO_API_KEY=lm-studio
-GROQ_MODEL=lmstudio/lfm2-8b-a1b
+MODEL_ID=lmstudio/lfm2-8b-a1b
 DATABASE_URL="file:./prisma/dev.db"
 ```
 
@@ -48,7 +48,7 @@ DATABASE_URL="file:./prisma/dev.db"
 
 ```bash
 GROQ_API_KEY=...
-GROQ_MODEL=groq/llama-3.3-70b-versatile
+MODEL_ID=groq/llama-3.3-70b-versatile
 DATABASE_URL="file:./prisma/dev.db"
 ```
 
@@ -80,7 +80,7 @@ Open `http://localhost:3000`.
 - `.env.local` が存在する（`env.example` をコピー）
 - `DATABASE_URL="file:./prisma/dev.db"` に設定済み
 - `npm run db:setup` 実行済み
-- LMSTUDIO利用時: `LMSTUDIO_BASE_URL=http://127.0.0.1:1234` と `GROQ_MODEL=lmstudio/<model>`
+- LMSTUDIO利用時: `LMSTUDIO_BASE_URL=http://127.0.0.1:1234` と `MODEL_ID=lmstudio/<model>`
 - Groq利用時: `GROQ_API_KEY` を設定、もしくは Settings で保存
 
 ## How it works
@@ -96,7 +96,7 @@ Open `http://localhost:3000`.
 > 優先順位（初見向け）
 >
 > 1. DB（Settings画面で保存した値）
-> 2. 環境変数（`GROQ_MODEL` など）
+> 2. 環境変数（`MODEL_ID` など）
 > 3. コード内のデフォルト（フォールバック）
 
 ### Settings
@@ -131,6 +131,10 @@ npm run db:setup
 
 ## Developer docs
 
+- [アーキテクチャ概要](docs/architecture.md)
+- [トラブルシューティング](docs/troubleshooting.md)
+- [セキュリティ（秘密情報/暗号化）](docs/security.md)
+- [テスト](docs/testing.md)
 - [ツール追加](docs/extension-tools.md)
 - [エージェント追加](docs/extension-agents.md)
 - [Settings項目追加](docs/extension-settings.md)
@@ -142,24 +146,4 @@ npm run db:setup
 
 ## Troubleshooting
 
-### Settingsが500 / `Unexpected end of JSON input`
-
-- DBが未作成 or `DATABASE_URL` が別DBを指している可能性が高いです
-- 対処:
-
-```bash
-npm run db:setup
-```
-
-### Windowsで `prisma generate` が `EPERM ... query_engine-windows.dll.node.tmp -> ...` で失敗
-
-- 対処（推奨）:
-  - dev server を止める
-  - `npm run db:generate` を実行
-  - それでもダメなら `docs/prisma-operations.md` の手順で DLL を掴んでいるプロセスを終了
-
-### SettingsでAPI keyを保存したいのにエラーになる
-
-- `APP_CONFIG_ENCRYPTION_KEY` が未設定、または形式が不正の可能性があります
-- 対処:
-  - `.env.local` に `APP_CONFIG_ENCRYPTION_KEY` を設定（生成: `npm run key:gen`）
+困ったらまず [`docs/troubleshooting.md`](docs/troubleshooting.md) を参照してください。

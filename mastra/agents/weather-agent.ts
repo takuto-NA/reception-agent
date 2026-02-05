@@ -1,5 +1,4 @@
 import { Agent } from "@mastra/core/agent";
-import { Memory } from "@mastra/memory";
 import { tools } from "../tools/registry";
 
 export const weatherAgent = new Agent({
@@ -20,8 +19,9 @@ export const weatherAgent = new Agent({
       Use the weatherTool to fetch current weather data.
 `,
   // Default to Groq via Mastra model router (uses GROQ_API_KEY env var)
-  model: process.env.GROQ_MODEL ?? "groq/llama-3.3-70b-versatile",
+  model:
+    process.env.MODEL_ID ??
+    process.env.GROQ_MODEL ??
+    "groq/llama-3.3-70b-versatile",
   tools,
-
-  memory: new Memory(),
 });

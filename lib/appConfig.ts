@@ -168,7 +168,12 @@ function parseVoiceSettingsJson(value: unknown): VoiceSettingsDTO {
 const DEFAULTS: AppConfigDTO = {
   systemPrompt:
     "You are a helpful assistant. Be concise, ask clarifying questions when needed, and use tools when appropriate.",
-  model: process.env.GROQ_MODEL ?? "groq/llama-3.3-70b-versatile",
+  // Provider-agnostic model identifier.
+  // Backward compatible: GROQ_MODEL is still supported.
+  model:
+    process.env.MODEL_ID ??
+    process.env.GROQ_MODEL ??
+    "groq/llama-3.3-70b-versatile",
   enabledTools: toolCatalog.map((t) => t.key),
   voiceSettings: {
     isVoiceConversationModeEnabledByDefault: DEFAULT_VOICE_CONVERSATION_MODE_ENABLED,

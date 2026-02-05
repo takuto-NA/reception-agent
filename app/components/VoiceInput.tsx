@@ -12,8 +12,8 @@ type SpeechRecognitionLike = {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
-  onresult: ((event: any) => void) | null;
-  onerror: ((event: any) => void) | null;
+  onresult: ((event: unknown) => void) | null;
+  onerror: ((event: unknown) => void) | null;
   onend: (() => void) | null;
   start(): void;
   stop(): void;
@@ -35,6 +35,32 @@ declare global {
     webkitSpeechRecognition?: SpeechRecognitionCtor;
     SpeechRecognition?: SpeechRecognitionCtor;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+type SpeechRecognitionResultEventLike = {
+  resultIndex: number;
+  results: ArrayLike<{
+    isFinal?: boolean;
+    0?: { transcript?: string };
+  }>;
+};
+
+function parseSpeechRecognitionResultEvent(
+  value: unknown,
+): SpeechRecognitionResultEventLike | null {
+  // Guard: event must be an object.
+  if (!isRecord(value)) return null;
+  const resultIndex = value.resultIndex;
+  const results = value.results;
+  // Guard: basic shape check.
+  if (typeof resultIndex !== "number" || !results || typeof results !== "object") {
+    return null;
+  }
+  return value as SpeechRecognitionResultEventLike;
 }
 
 export const VoiceInput = forwardRef<
@@ -68,6 +94,7 @@ export const VoiceInput = forwardRef<
     const ctor = (window.SpeechRecognition ??
       window.webkitSpeechRecognition) as SpeechRecognitionCtor | undefined;
     // Guard: React treats function arguments as state updaters; wrap to store the function itself.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Client-only API detection after mount.
     setSpeechRecognitionCtor(() => ctor);
   }, []);
 
@@ -78,22 +105,26 @@ export const VoiceInput = forwardRef<
     recognition.continuous = false;
     recognition.interimResults = true;
 
-    recognition.onresult = (resultEvent: any) => {
+    recognition.onresult = (resultEvent: unknown) => {
+      const parsedEvent = parseSpeechRecognitionResultEvent(resultEvent);
+      // Guard: unexpected event shape.
+      if (!parsedEvent) return;
       let finalText = "";
       for (
-        let resultIndex = resultEvent.resultIndex;
-        resultIndex < resultEvent.results.length;
+        let resultIndex = parsedEvent.resultIndex;
+        resultIndex < parsedEvent.results.length;
         resultIndex++
       ) {
-        const speechResult = resultEvent.results[resultIndex];
+        const speechResult = parsedEvent.results[resultIndex];
         const text = speechResult[0]?.transcript ?? "";
         if (speechResult.isFinal) finalText += text;
       }
       if (finalText.trim()) onFinalText(finalText.trim());
     };
 
-    recognition.onerror = (errorEvent: any) => {
-      setError(errorEvent?.error || "speech-error");
+    recognition.onerror = (errorEvent: unknown) => {
+      const errorValue = isRecord(errorEvent) ? errorEvent.error : undefined;
+      setError(typeof errorValue === "string" && errorValue ? errorValue : "speech-error");
       setListening(false);
     };
 

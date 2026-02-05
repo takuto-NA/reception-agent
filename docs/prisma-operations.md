@@ -6,6 +6,8 @@
 - **事故を防ぐ**: `DATABASE_URL` の取り違えや、マイグレーション未適用での 500 を回避する
 - **Windowsで詰まりやすい点**（Prisma Engine ロック）を事前に潰す
 
+> まず困ったら: [`docs/troubleshooting.md`](troubleshooting.md)
+
 ## まず確認すること（最重要）
 
 ### 1) どのDBを使っているか（`DATABASE_URL`）
@@ -44,6 +46,8 @@ npm run db:status
 
 > Note: Prisma CLI は `prisma.config.ts` がある場合、`.env.local` / `.env` を自動ロードしません。
 > このリポジトリでは `prisma.config.ts` 側で `.env.local` → `.env` の順にロードするようにしています。
+
+> Note: 可能な限り `npm run db:*` を使ってください（環境変数/設定の取り違え事故を減らします）。
 
 ### DBを作る / 更新する（開発）
 

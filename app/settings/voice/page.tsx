@@ -12,7 +12,7 @@ import {
   toSettingsErrorMessage,
   updateSettings,
 } from "../settingsApi";
-import { useTextToSpeech } from "@/app/components/useTextToSpeech";
+import { useTextToSpeech } from "@/app/hooks/useTextToSpeech";
 
 const WEB_SPEECH_RATE_MIN = 0.1;
 const WEB_SPEECH_RATE_MAX = 10.0;
@@ -36,6 +36,10 @@ function toNumberOrFallback(input: string, fallback: number): number {
   const parsed = Number(input);
   if (!Number.isFinite(parsed)) return fallback;
   return parsed;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 type VoiceVoxSpeakerStyleOption = {
@@ -133,18 +137,20 @@ export default function VoiceSettingsPage() {
         const speakers = Array.isArray(payload?.speakers) ? payload?.speakers : [];
         const nextOptions: VoiceVoxSpeakerStyleOption[] = [];
         for (const speaker of speakers) {
-          const speakerName =
-            typeof (speaker as any)?.name === "string" ? (speaker as any).name : "Unknown";
-          const styles = Array.isArray((speaker as any)?.styles)
-            ? ((speaker as any).styles as any[])
-            : [];
+          // Guard: unexpected speaker shape.
+          if (!isRecord(speaker)) continue;
+          const speakerName = typeof speaker.name === "string" ? speaker.name : "Unknown";
+
+          const stylesValue = speaker.styles;
+          const styles = Array.isArray(stylesValue) ? stylesValue : [];
           for (const style of styles) {
-            const styleId = (style as any)?.id;
+            // Guard: unexpected style shape.
+            if (!isRecord(style)) continue;
+            const styleId = style.id;
             // Guard: invalid style id.
             if (typeof styleId !== "number") continue;
 
-            const styleName =
-              typeof (style as any)?.name === "string" ? (style as any).name : "Default";
+            const styleName = typeof style.name === "string" ? style.name : "Default";
             nextOptions.push({
               styleId,
               label: `${speakerName} / ${styleName} (#${styleId})`,
@@ -476,44 +482,55 @@ export default function VoiceSettingsPage() {
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">Speaker ID</label>
-                {speakerOptionsLoading ? (
-                  <div className="text-xs text-zinc-500">Loading speakers…</div>
-                ) : speakerOptionsError ? (
-                  <div className="text-xs text-red-600 dark:text-red-400">
-                    {speakerOptionsError}
-                  </div>
-                ) : speakerOptions.length > 0 ? (
-                  <select
-                    value={voiceSettings.voicevox.speakerId}
-                    onChange={(changeEvent) =>
-                      setConfig((previousConfig) => {
-                        // Guard: state should exist here.
-                        if (!previousConfig) return previousConfig;
-                        const nextSpeakerId = toNumberOrFallback(
-                          changeEvent.target.value,
-                          previousConfig.voiceSettings.voicevox.speakerId,
-                        );
-                        return {
-                          ...previousConfig,
-                          voiceSettings: {
-                            ...previousConfig.voiceSettings,
-                            voicevox: {
-                              ...previousConfig.voiceSettings.voicevox,
-                              speakerId: nextSpeakerId,
+                {(() => {
+                  if (speakerOptionsLoading) {
+                    return (
+                      <div className="text-xs text-zinc-500">Loading speakers…</div>
+                    );
+                  }
+                  if (speakerOptionsError) {
+                    return (
+                      <div className="text-xs text-red-600 dark:text-red-400">
+                        {speakerOptionsError}
+                      </div>
+                    );
+                  }
+                  if (speakerOptions.length === 0) {
+                    return null;
+                  }
+                  return (
+                    <select
+                      value={voiceSettings.voicevox.speakerId}
+                      onChange={(changeEvent) =>
+                        setConfig((previousConfig) => {
+                          // Guard: state should exist here.
+                          if (!previousConfig) return previousConfig;
+                          const nextSpeakerId = toNumberOrFallback(
+                            changeEvent.target.value,
+                            previousConfig.voiceSettings.voicevox.speakerId,
+                          );
+                          return {
+                            ...previousConfig,
+                            voiceSettings: {
+                              ...previousConfig.voiceSettings,
+                              voicevox: {
+                                ...previousConfig.voiceSettings.voicevox,
+                                speakerId: nextSpeakerId,
+                              },
                             },
-                          },
-                        };
-                      })
-                    }
-                    className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-white/10 dark:bg-black/30 dark:focus:ring-white/20"
-                  >
-                    {speakerOptions.map((option) => (
-                      <option key={option.styleId} value={option.styleId}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                ) : null}
+                          };
+                        })
+                      }
+                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-white/10 dark:bg-black/30 dark:focus:ring-white/20"
+                    >
+                      {speakerOptions.map((option) => (
+                        <option key={option.styleId} value={option.styleId}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  );
+                })()}
 
                 <input
                   type="number"
