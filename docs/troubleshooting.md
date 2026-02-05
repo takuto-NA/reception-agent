@@ -100,5 +100,20 @@ npm run db:setup
 
 ### F) Windowsで `prisma generate` が `EPERM ... query_engine-windows.dll.node.tmp -> ...`
 
+原因:
+
+- `node.exe`（Next dev / テスト / エディタ拡張等）が Prisma Engine DLL を掴んでいる
+
+対処（推奨順）:
+
+1. **`npm run dev` を停止**
+2. もう一度 `npm run db:setup` または `npm run db:generate`
+3. それでもダメなら、DLLを掴んでいるプロセスを特定して終了
+
+```powershell
+tasklist /m query_engine-windows.dll.node
+Stop-Process -Id <PID> -Force
+```
+
 詳細: [`docs/prisma-operations.md`](prisma-operations.md)
 

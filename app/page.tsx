@@ -184,14 +184,20 @@ export default function Home() {
                 1) Copy <code>env.example</code> to <code>.env.local</code> and set
                 <code>DATABASE_URL=&quot;{FIRST_RUN_DATABASE_URL}&quot;</code>.
               </div>
-              <div>2) Run <code>npm run db:setup</code> to initialize the DB.</div>
+              <div>
+                2) Run <code>npm run db:setup</code> to initialize the DB (Windows: stop{" "}
+                <code>npm run dev</code> first if Prisma shows <code>EPERM</code>).
+              </div>
               <div>
                 3) For LMSTUDIO set <code>LMSTUDIO_BASE_URL={FIRST_RUN_LMSTUDIO_URL}</code> and
-                model <code>{FIRST_RUN_MODEL_LMSTUDIO}</code>. For Groq use model{" "}
-                <code>{FIRST_RUN_MODEL_GROQ}</code>.
+                set <code>MODEL_ID={FIRST_RUN_MODEL_LMSTUDIO}</code>. For Groq set{" "}
+                <code>MODEL_ID={FIRST_RUN_MODEL_GROQ}</code>.
               </div>
               <div>
                 4) Open <a className="underline" href="/settings">Settings</a> to confirm.
+              </div>
+              <div>
+                Need help? See <code>docs/troubleshooting.md</code>.
               </div>
             </div>
           </div>

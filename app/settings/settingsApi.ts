@@ -56,7 +56,11 @@ type ApiErrorResponse = {
 
 const SETTINGS_ERROR_CODE_MESSAGE_MAP: Record<string, string> = {
   DB_SCHEMA_MISMATCH:
-    "Database schema mismatch. Run `npm run db:setup` and confirm DATABASE_URL is file:./prisma/dev.db.",
+    [
+      "Database schema mismatch.",
+      "Run `npm run db:setup` and confirm DATABASE_URL is file:./prisma/dev.db.",
+      "Windows note: if Prisma generate fails with EPERM, stop `npm run dev` and see docs/troubleshooting.md.",
+    ].join(" "),
   INVALID_JSON: "Invalid JSON request. Refresh the page and try again.",
 };
 

@@ -69,5 +69,31 @@ const child = spawn("npx", ["prisma", ...args], {
 });
 
 child.on("exit", (code) => {
+  /**
+   * Responsibility:
+   * - Provide actionable guidance for common Windows Prisma failures (EPERM rename).
+   */
+  if ((code ?? 1) !== 0 && currentPlatform === "win32") {
+    const prismaSubcommand = args.join(" ");
+    const isGenerateLike =
+      prismaSubcommand.includes("generate") ||
+      prismaSubcommand.includes("migrate") ||
+      prismaSubcommand.includes("db");
+    if (isGenerateLike) {
+      console.error(
+        [
+          "",
+          "[prisma] Windows hint:",
+          "- If you see EPERM rename errors for query_engine-windows.dll.node, a node.exe process is locking the Prisma engine DLL.",
+          "- Stop `npm run dev` (and any tests) and try again.",
+          "- If it still fails, find and stop the locking process:",
+          "  tasklist /m query_engine-windows.dll.node",
+          "  Stop-Process -Id <PID> -Force",
+          "- See: docs/troubleshooting.md",
+          "",
+        ].join("\n"),
+      );
+    }
+  }
   process.exit(code ?? 1);
 });

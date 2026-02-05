@@ -58,6 +58,8 @@ DATABASE_URL="file:./prisma/dev.db"
 npm run db:setup
 ```
 
+> Windowsの注意: `EPERM ... query_engine-windows.dll.node.tmp -> ...` が出る場合は\n+> `node.exe` がPrismaのDLLを掴んでいます。`npm run dev` を止めてから再実行し、ダメなら\n+> `tasklist /m query_engine-windows.dll.node` でPIDを特定して終了してください。\n+> 詳細: [`docs/troubleshooting.md`](docs/troubleshooting.md) / [`docs/prisma-operations.md`](docs/prisma-operations.md)
+
 4. Run dev server
 
 ```bash

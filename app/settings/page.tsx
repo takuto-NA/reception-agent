@@ -154,7 +154,17 @@ export default function SettingsPage() {
                   <div>
                     For LMSTUDIO set <code>LMSTUDIO_BASE_URL={FIRST_RUN_LMSTUDIO_URL}</code>.
                   </div>
-                  <div>Run <code>npm run db:setup</code> after changing DB settings.</div>
+                  <div>
+                    If you prefer env-based model selection, set <code>MODEL_ID</code> in{" "}
+                    <code>.env.local</code> (example: <code>{MODEL_EXAMPLE_GROQ}</code>).
+                  </div>
+                  <div>
+                    Run <code>npm run db:setup</code> after changing DB settings (Windows: stop{" "}
+                    <code>npm run dev</code> first if Prisma shows <code>EPERM</code>).
+                  </div>
+                  <div>
+                    If you get stuck, see <code>docs/troubleshooting.md</code>.
+                  </div>
                 </div>
               </div>
 
