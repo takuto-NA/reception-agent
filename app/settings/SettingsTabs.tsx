@@ -17,6 +17,7 @@ const SETTINGS_TABS: SettingsTab[] = [
   { href: "/settings", label: "General" },
   { href: "/settings/tools", label: "Tools" },
   { href: "/settings/voice", label: "Voice" },
+  { href: "/settings/presence", label: "Presence" },
 ];
 
 const TAB_BASE_CLASS_NAME =

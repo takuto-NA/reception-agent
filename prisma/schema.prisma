@@ -16,6 +16,7 @@ model AppConfig {
   model        String
   enabledTools Json?
   voiceSettings Json?
+  presenceSettings Json?
   /// Encrypted Groq API key (AES-256-GCM). Never return plaintext to the client.
   groqApiKeyEncrypted String?
   createdAt    DateTime @default(now())

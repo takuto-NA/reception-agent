@@ -33,6 +33,29 @@ const VOICEVOX_INTONATION_SCALE_MAX = 2.0;
 const VOICEVOX_VOLUME_SCALE_MIN = 0.0;
 const VOICEVOX_VOLUME_SCALE_MAX = 2.0;
 
+const PRESENCE_EVENT_TEXT_TEMPLATE_MIN_LENGTH = 1;
+const PRESENCE_EVENT_TEXT_TEMPLATE_MAX_LENGTH = 500;
+const PRESENCE_DETECTION_FPS_MIN = 1;
+const PRESENCE_DETECTION_FPS_MAX = 30;
+const PRESENCE_MAX_FACES_MIN = 1;
+const PRESENCE_MAX_FACES_MAX = 25;
+const PRESENCE_MIN_CONFIDENCE_MIN = 0.0;
+const PRESENCE_MIN_CONFIDENCE_MAX = 1.0;
+const PRESENCE_MIN_FACE_AREA_RATIO_MIN = 0.0;
+const PRESENCE_MIN_FACE_AREA_RATIO_MAX = 1.0;
+const PRESENCE_INTERACTION_ZONE_MARGIN_RATIO_MIN = 0.0;
+const PRESENCE_INTERACTION_ZONE_MARGIN_RATIO_MAX = 0.45;
+const PRESENCE_ASSIGNMENT_IOU_THRESHOLD_MIN = 0.0;
+const PRESENCE_ASSIGNMENT_IOU_THRESHOLD_MAX = 1.0;
+const PRESENCE_TRACK_MAX_MISSED_FRAMES_MIN = 0;
+const PRESENCE_TRACK_MAX_MISSED_FRAMES_MAX = 120;
+const PRESENCE_STABLE_FRAMES_REQUIRED_MIN = 1;
+const PRESENCE_STABLE_FRAMES_REQUIRED_MAX = 60;
+const PRESENCE_DWELL_MS_TO_GREET_MIN = 0;
+const PRESENCE_DWELL_MS_TO_GREET_MAX = 600000;
+const PRESENCE_GREET_COOLDOWN_MS_MIN = 0;
+const PRESENCE_GREET_COOLDOWN_MS_MAX = 3600000;
+
 const GROQ_API_KEY_MIN_LENGTH = 1;
 const GROQ_API_KEY_MAX_LENGTH = 200;
 
@@ -120,6 +143,56 @@ const VoiceSettingsSchema = z
   })
   .strict();
 
+const PresenceSettingsSchema = z
+  .object({
+    isEnabledByDefault: z.boolean(),
+    isDebugPanelEnabledByDefault: z.boolean(),
+    isOverlayEnabledByDefault: z.boolean(),
+    detectionFps: z.number().int().min(PRESENCE_DETECTION_FPS_MIN).max(PRESENCE_DETECTION_FPS_MAX),
+    maxFaces: z.number().int().min(PRESENCE_MAX_FACES_MIN).max(PRESENCE_MAX_FACES_MAX),
+    minConfidence: z
+      .number()
+      .min(PRESENCE_MIN_CONFIDENCE_MIN)
+      .max(PRESENCE_MIN_CONFIDENCE_MAX),
+    minFaceAreaRatio: z
+      .number()
+      .min(PRESENCE_MIN_FACE_AREA_RATIO_MIN)
+      .max(PRESENCE_MIN_FACE_AREA_RATIO_MAX),
+    interactionZoneMarginRatio: z
+      .number()
+      .min(PRESENCE_INTERACTION_ZONE_MARGIN_RATIO_MIN)
+      .max(PRESENCE_INTERACTION_ZONE_MARGIN_RATIO_MAX),
+    assignmentIouThreshold: z
+      .number()
+      .min(PRESENCE_ASSIGNMENT_IOU_THRESHOLD_MIN)
+      .max(PRESENCE_ASSIGNMENT_IOU_THRESHOLD_MAX),
+    trackMaxMissedFrames: z
+      .number()
+      .int()
+      .min(PRESENCE_TRACK_MAX_MISSED_FRAMES_MIN)
+      .max(PRESENCE_TRACK_MAX_MISSED_FRAMES_MAX),
+    stableFramesRequired: z
+      .number()
+      .int()
+      .min(PRESENCE_STABLE_FRAMES_REQUIRED_MIN)
+      .max(PRESENCE_STABLE_FRAMES_REQUIRED_MAX),
+    dwellMsToGreet: z
+      .number()
+      .int()
+      .min(PRESENCE_DWELL_MS_TO_GREET_MIN)
+      .max(PRESENCE_DWELL_MS_TO_GREET_MAX),
+    greetCooldownMs: z
+      .number()
+      .int()
+      .min(PRESENCE_GREET_COOLDOWN_MS_MIN)
+      .max(PRESENCE_GREET_COOLDOWN_MS_MAX),
+    eventTextTemplate: z
+      .string()
+      .min(PRESENCE_EVENT_TEXT_TEMPLATE_MIN_LENGTH)
+      .max(PRESENCE_EVENT_TEXT_TEMPLATE_MAX_LENGTH),
+  })
+  .strict();
+
 const UpdateSchema = z
   .object({
     systemPrompt: z
@@ -137,6 +210,7 @@ const UpdateSchema = z
       .max(ENABLED_TOOLS_MAX_COUNT)
       .optional(),
     voiceSettings: VoiceSettingsSchema.optional(),
+    presenceSettings: PresenceSettingsSchema.optional(),
     groqApiKey: z.string().min(GROQ_API_KEY_MIN_LENGTH).max(GROQ_API_KEY_MAX_LENGTH).optional(),
     clearGroqApiKey: z.boolean().optional(),
   })
@@ -185,7 +259,8 @@ export async function PUT(request: Request) {
       typeof configUpdate.systemPrompt !== "undefined" ||
       typeof configUpdate.model !== "undefined" ||
       typeof configUpdate.enabledTools !== "undefined" ||
-      typeof configUpdate.voiceSettings !== "undefined";
+      typeof configUpdate.voiceSettings !== "undefined" ||
+      typeof configUpdate.presenceSettings !== "undefined";
 
     if (hasConfigUpdate) {
       await upsertAppConfig(configUpdate);

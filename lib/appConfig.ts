@@ -35,11 +35,29 @@ export type VoiceSettingsDTO = {
   voicevox: VoiceVoxVoiceSettingsDTO;
 };
 
+export type PresenceSettingsDTO = {
+  isEnabledByDefault: boolean;
+  isDebugPanelEnabledByDefault: boolean;
+  isOverlayEnabledByDefault: boolean;
+  detectionFps: number;
+  maxFaces: number;
+  minConfidence: number;
+  minFaceAreaRatio: number;
+  interactionZoneMarginRatio: number;
+  assignmentIouThreshold: number;
+  trackMaxMissedFrames: number;
+  stableFramesRequired: number;
+  dwellMsToGreet: number;
+  greetCooldownMs: number;
+  eventTextTemplate: string;
+};
+
 export type AppConfigDTO = {
   systemPrompt: string;
   model: string;
   enabledTools: ToolKey[];
   voiceSettings: VoiceSettingsDTO;
+  presenceSettings: PresenceSettingsDTO;
   hasGroqApiKey: boolean;
 };
 
@@ -65,6 +83,22 @@ const DEFAULT_VOICEVOX_SPEED_SCALE = 1.0;
 const DEFAULT_VOICEVOX_PITCH_SCALE = 0.0;
 const DEFAULT_VOICEVOX_INTONATION_SCALE = 1.0;
 const DEFAULT_VOICEVOX_VOLUME_SCALE = 1.0;
+
+const DEFAULT_PRESENCE_ENABLED = false;
+const DEFAULT_PRESENCE_DEBUG_PANEL_ENABLED = true;
+const DEFAULT_PRESENCE_OVERLAY_ENABLED = true;
+const DEFAULT_PRESENCE_DETECTION_FPS = 8;
+const DEFAULT_PRESENCE_MAX_FACES = 6;
+const DEFAULT_PRESENCE_MIN_CONFIDENCE = 0.6;
+const DEFAULT_PRESENCE_MIN_FACE_AREA_RATIO = 0.01;
+const DEFAULT_PRESENCE_INTERACTION_ZONE_MARGIN_RATIO = 0.1;
+const DEFAULT_PRESENCE_ASSIGNMENT_IOU_THRESHOLD = 0.25;
+const DEFAULT_PRESENCE_TRACK_MAX_MISSED_FRAMES = 10;
+const DEFAULT_PRESENCE_STABLE_FRAMES_REQUIRED = 4;
+const DEFAULT_PRESENCE_DWELL_MS_TO_GREET = 3500;
+const DEFAULT_PRESENCE_GREET_COOLDOWN_MS = 20000;
+const DEFAULT_PRESENCE_EVENT_TEXT_TEMPLATE =
+  "【来客】{count}名がカメラ前に滞在しています。受付としてグループに話しかけてください。";
 
 function parseEnabledToolsJson(value: unknown): ToolKey[] {
   // Guard: Prisma Json might be null/unknown.
@@ -165,6 +199,51 @@ function parseVoiceSettingsJson(value: unknown): VoiceSettingsDTO {
   };
 }
 
+function parsePresenceSettingsJson(value: unknown): PresenceSettingsDTO {
+  /**
+   * Responsibility:
+   * - Parse Presence settings JSON from Prisma with defensive fallbacks.
+   */
+  const fallback = DEFAULTS.presenceSettings;
+  // Guard: Prisma Json might be null/unknown.
+  if (!isRecord(value)) return fallback;
+
+  return {
+    isEnabledByDefault: parseBoolean(value.isEnabledByDefault, fallback.isEnabledByDefault),
+    isDebugPanelEnabledByDefault: parseBoolean(
+      value.isDebugPanelEnabledByDefault,
+      fallback.isDebugPanelEnabledByDefault,
+    ),
+    isOverlayEnabledByDefault: parseBoolean(
+      value.isOverlayEnabledByDefault,
+      fallback.isOverlayEnabledByDefault,
+    ),
+    detectionFps: parseNumber(value.detectionFps, fallback.detectionFps),
+    maxFaces: parseNumber(value.maxFaces, fallback.maxFaces),
+    minConfidence: parseNumber(value.minConfidence, fallback.minConfidence),
+    minFaceAreaRatio: parseNumber(value.minFaceAreaRatio, fallback.minFaceAreaRatio),
+    interactionZoneMarginRatio: parseNumber(
+      value.interactionZoneMarginRatio,
+      fallback.interactionZoneMarginRatio,
+    ),
+    assignmentIouThreshold: parseNumber(
+      value.assignmentIouThreshold,
+      fallback.assignmentIouThreshold,
+    ),
+    trackMaxMissedFrames: parseNumber(
+      value.trackMaxMissedFrames,
+      fallback.trackMaxMissedFrames,
+    ),
+    stableFramesRequired: parseNumber(
+      value.stableFramesRequired,
+      fallback.stableFramesRequired,
+    ),
+    dwellMsToGreet: parseNumber(value.dwellMsToGreet, fallback.dwellMsToGreet),
+    greetCooldownMs: parseNumber(value.greetCooldownMs, fallback.greetCooldownMs),
+    eventTextTemplate: parseString(value.eventTextTemplate, fallback.eventTextTemplate),
+  };
+}
+
 const DEFAULTS: AppConfigDTO = {
   systemPrompt:
     "You are a helpful assistant. Be concise, ask clarifying questions when needed, and use tools when appropriate.",
@@ -195,6 +274,22 @@ const DEFAULTS: AppConfigDTO = {
       volumeScale: DEFAULT_VOICEVOX_VOLUME_SCALE,
     },
   },
+  presenceSettings: {
+    isEnabledByDefault: DEFAULT_PRESENCE_ENABLED,
+    isDebugPanelEnabledByDefault: DEFAULT_PRESENCE_DEBUG_PANEL_ENABLED,
+    isOverlayEnabledByDefault: DEFAULT_PRESENCE_OVERLAY_ENABLED,
+    detectionFps: DEFAULT_PRESENCE_DETECTION_FPS,
+    maxFaces: DEFAULT_PRESENCE_MAX_FACES,
+    minConfidence: DEFAULT_PRESENCE_MIN_CONFIDENCE,
+    minFaceAreaRatio: DEFAULT_PRESENCE_MIN_FACE_AREA_RATIO,
+    interactionZoneMarginRatio: DEFAULT_PRESENCE_INTERACTION_ZONE_MARGIN_RATIO,
+    assignmentIouThreshold: DEFAULT_PRESENCE_ASSIGNMENT_IOU_THRESHOLD,
+    trackMaxMissedFrames: DEFAULT_PRESENCE_TRACK_MAX_MISSED_FRAMES,
+    stableFramesRequired: DEFAULT_PRESENCE_STABLE_FRAMES_REQUIRED,
+    dwellMsToGreet: DEFAULT_PRESENCE_DWELL_MS_TO_GREET,
+    greetCooldownMs: DEFAULT_PRESENCE_GREET_COOLDOWN_MS,
+    eventTextTemplate: DEFAULT_PRESENCE_EVENT_TEXT_TEMPLATE,
+  },
   hasGroqApiKey: DEFAULT_HAS_GROQ_API_KEY,
 };
 
@@ -203,12 +298,14 @@ export async function getAppConfig(): Promise<AppConfigDTO> {
   if (!row) return DEFAULTS;
   const enabledTools = parseEnabledToolsJson(row.enabledTools);
   const voiceSettings = parseVoiceSettingsJson(row.voiceSettings);
+  const presenceSettings = parsePresenceSettingsJson(row.presenceSettings);
   const hasGroqApiKey = Boolean(row.groqApiKeyEncrypted?.trim());
   return {
     systemPrompt: row.systemPrompt,
     model: row.model,
     enabledTools,
     voiceSettings,
+    presenceSettings,
     hasGroqApiKey,
   };
 }
@@ -220,6 +317,7 @@ export async function upsertAppConfig(input: Partial<AppConfigDTO>) {
     model: input.model ?? current.model,
     enabledTools: input.enabledTools ?? current.enabledTools,
     voiceSettings: input.voiceSettings ?? current.voiceSettings,
+    presenceSettings: input.presenceSettings ?? current.presenceSettings,
     // Guard: API key is managed via dedicated endpoints and is never echoed back as plaintext.
     hasGroqApiKey: current.hasGroqApiKey,
   };
@@ -232,12 +330,14 @@ export async function upsertAppConfig(input: Partial<AppConfigDTO>) {
       model: next.model,
       enabledTools: next.enabledTools,
       voiceSettings: next.voiceSettings,
+      presenceSettings: next.presenceSettings,
     },
     update: {
       systemPrompt: next.systemPrompt,
       model: next.model,
       enabledTools: next.enabledTools,
       voiceSettings: next.voiceSettings,
+      presenceSettings: next.presenceSettings,
     },
   });
 
@@ -260,6 +360,7 @@ export async function setGroqApiKey(plaintextGroqApiKey: string) {
       model: DEFAULTS.model,
       enabledTools: DEFAULTS.enabledTools,
       voiceSettings: DEFAULTS.voiceSettings,
+      presenceSettings: DEFAULTS.presenceSettings,
       groqApiKeyEncrypted: encrypted,
     },
     update: {
@@ -277,6 +378,7 @@ export async function clearGroqApiKey() {
       model: DEFAULTS.model,
       enabledTools: DEFAULTS.enabledTools,
       voiceSettings: DEFAULTS.voiceSettings,
+      presenceSettings: DEFAULTS.presenceSettings,
       groqApiKeyEncrypted: null,
     },
     update: {

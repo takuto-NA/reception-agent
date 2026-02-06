@@ -33,11 +33,29 @@ export type VoiceSettingsDTO = {
   voicevox: VoiceVoxVoiceSettingsDTO;
 };
 
+export type PresenceSettingsDTO = {
+  isEnabledByDefault: boolean;
+  isDebugPanelEnabledByDefault: boolean;
+  isOverlayEnabledByDefault: boolean;
+  detectionFps: number;
+  maxFaces: number;
+  minConfidence: number;
+  minFaceAreaRatio: number;
+  interactionZoneMarginRatio: number;
+  assignmentIouThreshold: number;
+  trackMaxMissedFrames: number;
+  stableFramesRequired: number;
+  dwellMsToGreet: number;
+  greetCooldownMs: number;
+  eventTextTemplate: string;
+};
+
 export type AppConfigDTO = {
   systemPrompt: string;
   model: string;
   enabledTools: string[];
   voiceSettings: VoiceSettingsDTO;
+  presenceSettings: PresenceSettingsDTO;
   hasGroqApiKey: boolean;
 };
 
@@ -138,6 +156,7 @@ export async function updateSettings(
     model: nextConfig.model,
     enabledTools: nextConfig.enabledTools,
     voiceSettings: nextConfig.voiceSettings,
+    presenceSettings: nextConfig.presenceSettings,
   };
   const updateResponse = await fetch("/api/settings", {
     method: "PUT",
